@@ -50,6 +50,7 @@ type conn struct {
 	// goroutine so a handler may call send() without deadlocking the read loop).
 	// Used for CDP flows that must reply immediately, e.g. proxy auth.
 	onEvent func(method string, params json.RawMessage, sessionID string)
+	onEventMu sync.RWMutex
 
 	closed chan struct{}
 	once   sync.Once
@@ -96,8 +97,8 @@ func (c *conn) readLoop() {
 			continue
 		}
 		if m.Method != "" {
-			if c.onEvent != nil {
-				go c.onEvent(m.Method, m.Params, m.SessionID)
+			if fn := c.getOnEvent(); fn != nil {
+				go fn(m.Method, m.Params, m.SessionID)
 			}
 			c.eventsMu.Lock()
 			// Keep the tail only; a chatty page would otherwise grow forever.
@@ -110,6 +111,17 @@ func (c *conn) readLoop() {
 			c.eventsMu.Unlock()
 		}
 	}
+}
+
+func (c *conn) setOnEvent(fn func(string,json.RawMessage,string)) {
+ c.onEventMu.Lock()
+ c.onEvent=fn
+ c.onEventMu.Unlock()
+}
+func (c *conn) getOnEvent() func(string,json.RawMessage,string) {
+ c.onEventMu.RLock()
+ defer c.onEventMu.RUnlock()
+ return c.onEvent
 }
 
 func (c *conn) shutdown() {
