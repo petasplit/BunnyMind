@@ -3,6 +3,7 @@ package bunnyautoprobe
 import (
  "context"
  "crypto/rand"
+ "errors"
  "encoding/json"
  "net/http"
  "net/http/httptest"
@@ -118,4 +119,57 @@ func TestAdaptiveStopReasonNeverClaimsExploit(t *testing.T){
  inconclusive:=bunnyscript.EvidenceSummary{Outcome:"inconclusive_or_failed_control"}
  next,stop,_=NextIndex(s,0,inconclusive,false)
  if stop||next!=1{t.Fatal("inconclusive outcome did not advance to next approved target")}
+}
+
+type fakeCookies struct{}
+func (fakeCookies) Resolve(_ context.Context,actor,key string)(string,error){
+ if key!="session_cookie"{return "",errors.New("only synthetic session cookie is available")}
+ if actor=="owner"{return "session=owner",nil}
+ if actor=="peer"{return "session=peer",nil}
+ return "",errors.New("unknown test account")
+}
+func TestAdaptiveOwnerPeerSameResourceWithSeparateCredentials(t *testing.T){
+ python,err:=exec.LookPath("python3")
+ if err!=nil{python,err=exec.LookPath("python")}
+ if err!=nil{t.Skip("Python 3 required")}
+ const marker="BUNNY-OWNED-RESOURCE-48320"
+ server:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+  if r.URL.Path!="/account/shared"{w.WriteHeader(http.StatusNotFound);return}
+  if strings.Contains(r.Header.Get("Cookie"),"session=owner"){
+   _,_=w.Write([]byte(marker))
+  }else{
+   w.WriteHeader(http.StatusForbidden)
+   _,_=w.Write([]byte("not authorized for this account"))
+  }
+ }))
+ defer server.Close()
+ spec:=Spec{EngagementID:"ownerpeer",CampaignID:"ownerpeer-study",Origin:server.URL,
+  Marker:marker,CandidatePaths:[]string{"/account/shared"},
+  NegativeControlPaths:[]string{"/account/shared"},
+  CandidatePersona:"owner",ControlPersona:"peer",
+  MaxRounds:2,MaxRequests:8,
+ }
+ policy:=bunnyguard.Policy{EngagementID:spec.EngagementID,
+  AllowedOrigins:[]string{server.URL},AllowedMethods:[]string{"GET"},
+  MaxNetworkCalls:16}
+ if err:=Validate(spec,policy);err!=nil{t.Fatal(err)}
+ key:=make([]byte,32);_,_=rand.Read(key)
+ result,err:=(Runner{Proof:bunnyscript.Runner{
+  Root:t.TempDir(),Python:python,EncryptionKey:key,Secrets:fakeCookies{},
+ }}).Execute(context.Background(),spec,policy)
+ if err!=nil{t.Fatal(err)}
+ if result.Outcome!="replicated_observation_unverified"||len(result.Runs)!=2{
+  t.Fatalf("owner-peer controls not isolated %+v",result)
+ }
+ for _,one:=range result.Runs{
+  if len(one.CandidateStatus)!=2||one.CandidateStatus[0]!=200||
+   len(one.ControlStatus)!=2||one.ControlStatus[0]!=403{
+   t.Fatalf("test-persona boundary was not observed: %+v",one)
+  }
+ }
+ // The same user cannot be a genuine negative control on the same path.
+ spec.ControlPersona="owner"
+ if err:=Validate(spec,policy);err==nil{
+  t.Fatal("same-account control on the same resource was incorrectly accepted")
+ }
 }
