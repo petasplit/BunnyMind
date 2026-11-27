@@ -37,6 +37,7 @@ func init() {
 		authAccessMatrixTool{},
 		authBrowserLabTool{},
 		approvedBrowserAuthTool{},
+		approvedAdaptiveAuthTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},

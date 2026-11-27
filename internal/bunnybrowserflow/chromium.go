@@ -34,7 +34,7 @@ func jsQuoted(s string)string{
  return string(b)
 }
 func (d *chromeDriver) Fill(ctx context.Context,selector,value string)error{
- if !validSelector.MatchString(selector)||len(value)==0||len(value)>256{return errors.New("invalid trusted field input")}
+ if !(validSelector.MatchString(selector)||safeDiscoveredSelector.MatchString(selector))||len(value)==0||len(value)>256{return errors.New("invalid trusted field input")}
  // Keep credential bytes out of injected JavaScript source: only the
  // operator-locked selector goes into JS, followed by a CDP text event.
  script:=fmt.Sprintf(`(() => {
