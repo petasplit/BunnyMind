@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/enowdev/antares/internal/board"
+	"github.com/enowdev/antares/internal/bunnyguard"
 	"github.com/enowdev/antares/internal/checkpoint"
 	"github.com/enowdev/antares/internal/config"
 	"github.com/enowdev/antares/internal/engagement"
@@ -358,8 +359,16 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		}
 		_ = emit(Event{Type: EventDone})
 	}()
-	// A completed authorized engagement starts work immediately, without
-	// requiring the user to manually select the Security Lead role.
+	// A structured, manifest-authorized target/scope brief may select the
+	// scoped Security toolset automatically. Other conversations retain their
+	// configured role and tools, and sub-agents never auto-start engagements.
+	if !req.Quiet && req.Depth == 0 && req.Role == "" && req.Toolset == "" {
+		if initial, _ := authorizedAutoEngagement(req.Message, strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))); initial.URL != "" {
+			req.Role = "security"
+		}
+	}
+	// The existing natural-language security mission recognizer handles
+	// authorized briefs that are not structured as Target:/Scope: lines.
 	autoSelectSecurityRole(&req)
 	cfg := a.config()
 
@@ -399,6 +408,17 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		emptyResponseCount int           // consecutive empty model responses, capped to prevent loops
 		failures           []toolFailure // errored tool calls, for post-turn learning
 	)
+	// A complete Target:/Scope: brief must produce a real, scoped network
+	// tool event before any model-generated narration. The scoped transport,
+	// BunnyGuard audit, rate budget and redirect checks remain in force.
+	kickoffHistory, kickoffCount, err := a.autoKickoff(runCtx, req, sess, byName, modelName, emit)
+	if err != nil {
+		return nil, err
+	}
+	history = append(history, kickoffHistory...)
+	toolCalls += kickoffCount
+	totalToolCalls += kickoffCount
+
 	repeats := newRepeatTracker(cfg.Agent.RepeatLimit)
 	todoOpenPrev := -1 // open task count at the last nudge, to detect no progress
 
