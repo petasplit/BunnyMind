@@ -26,35 +26,7 @@ const (
  OpHandoff="operator_handoff"
 )
 var validActor=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
-var validSelector=regexp.MustCompile(`^[a-zA-Z0-9_#.= -]{1,100}// Package bunnybrowserflow runs constrained, operator-authored account
-// workflows in isolated browser profiles. It never selects public targets,
-// creates credentials, or bypasses a verification challenge on its own.
-package bunnybrowserflow
-
-import (
- "context"
- "crypto/sha256"
- "encoding/hex"
- "errors"
- "fmt"
- "net"
- "net/url"
- "regexp"
- "strings"
- "time"
-)
-
-const (
- MaxActors=4
- MaxSteps=32
- OpNavigate="navigate"
- OpFill="fill_secret"
- OpClick="click"
- OpAssert="assert_text"
- OpHandoff="operator_handoff"
-)
-var validActor=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
-)
+var validSelector=regexp.MustCompile(`^[a-zA-Z0-9_#.= -]{1,100}$`)
 var validKey=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 var validPath=regexp.MustCompile(`^/[a-zA-Z0-9_./%-]{0,255}$`)
 
