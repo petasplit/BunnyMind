@@ -36,6 +36,7 @@ type Session struct {
  popupSessions []popupSession
  parentSession string
  popupMax int
+ virtualReady atomic.Bool
 
 }
 
@@ -331,6 +332,7 @@ func (s *Session) killLocked() {
  s.popupMax=0
  s.popupMu.Unlock()
  s.parentSession=""
+ s.virtualReady.Store(false)
 	s.targetID = ""
 	if s.tempDir != "" {
 		_ = os.RemoveAll(s.tempDir)
