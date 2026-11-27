@@ -95,13 +95,15 @@ func validateTrace(raw []byte,p Plan)(EvidenceSummary,error){
    return EvidenceSummary{},errors.New("reported proof marker is not present in captured response")
   }
   if o.Status<100||o.Status>599{return EvidenceSummary{},errors.New("invalid HTTP response status")}
+  markerInRequest:=bytes.Contains(rq,[]byte(p.Marker))
   receipt:=SampleReceipt{SampleID:o.SampleID,Kind:o.Kind,Persona:o.Persona,Status:o.Status,
    RequestSHA256:o.RequestSHA256,ResponseSHA256:o.ResponseSHA256,
-   MarkerPresent:o.MarkerPresent,Truncated:o.Truncated,ObservedAt:o.ObservedAt}
+   MarkerPresent:o.MarkerPresent,MarkerInRequest:markerInRequest,
+   Truncated:o.Truncated,ObservedAt:o.ObservedAt}
   summary.Receipts=append(summary.Receipts,receipt)
   if o.Kind=="candidate"{
    summary.Candidates++
-   if o.MarkerPresent&&o.Status>=200&&o.Status<300&&!o.Truncated{summary.ConsistentCandidates++}
+   if o.MarkerPresent&&!markerInRequest&&o.Status>=200&&o.Status<300&&!o.Truncated{summary.ConsistentCandidates++}
   }else{
    summary.Controls++
    if !o.MarkerPresent&&o.Status>=200&&o.Status<500&&!o.Truncated{summary.ConsistentControls++}
