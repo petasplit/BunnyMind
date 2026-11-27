@@ -41,12 +41,14 @@ jobs:
         run: |
           mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
-          sha256sum dist/BunnyMind-windows-x64.exe > dist/SHA256SUMS.txt
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authz-demo-windows-x64.exe ./cmd/bunnyauthz-demo
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
           name: BunnyMind-windows-x64-ci
           path: |
             dist/BunnyMind-windows-x64.exe
+            dist/BunnyMind-authz-demo-windows-x64.exe
             dist/SHA256SUMS.txt
           retention-days: 7

@@ -67,3 +67,34 @@ user-owned staging environments, allowlisted through an actual egress
 boundary, with explicit operator authorization and test-account isolation.
 Do not reuse this test-only code for live third-party sites without that
 containment and independent review.
+
+
+## Runnable demonstration (Windows / Linux / macOS)
+
+The fork also contains a standalone demonstration command:
+
+```sh
+go run ./cmd/bunnyauthz-demo
+```
+
+This starts a disposable `httptest` server bound to numeric loopback,
+uses two fixed **synthetic** identities, and reports
+`cross_persona_denied_in_lab` for the secure fixture. To demonstrate a
+controlled simulated authorization failure:
+
+```sh
+go run ./cmd/bunnyauthz-demo -vulnerable
+```
+
+The expected result is `cross_persona_marker_observed_in_lab`. Both
+modes compute actual HTTP response digests and Ed25519 receipts, then
+verify those signatures and evaluate owner/foreign/anonymous controls.
+No raw account token or response body is printed.
+
+The demo signer and fixture intentionally run in the **same process**,
+so the result is only a reproducible example, not independent attestation.
+Only the separate recorder with an isolated key can eventually support
+stronger provenance guarantees.
+
+The GitHub Windows x64 workflow compiles the standalone demo executable
+alongside the main BunnyMind build and makes it available as a CI artifact.
