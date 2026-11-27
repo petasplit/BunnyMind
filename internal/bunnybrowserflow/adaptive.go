@@ -19,6 +19,7 @@ type AdaptiveConfig struct {
  Actors []string `json:"actors"`
  SuccessText string `json:"success_text"`
  UseEmailOTP bool `json:"use_email_otp"`
+ Mailboxes map[string]MailboxSettings `json:"mailboxes,omitempty"`
 }
 type OTPProvider interface {
  Arm(context.Context,string)error
@@ -44,6 +45,11 @@ func ValidateAdaptive(cfg AdaptiveConfig,scope ApprovedScope,manifest bunnyguard
   return errors.New("aggregate adaptive browser request budget exceeds permission")
  }
  if len(scope.ApprovedPostPaths)==0{return errors.New("adaptive auth requires explicitly approved POST paths")}
+ if cfg.UseEmailOTP {
+  if len(cfg.Mailboxes)!=len(cfg.Actors){return errors.New("each OTP persona requires its own configured mailbox")}
+  for _,actor:=range cfg.Actors{if _,ok:=cfg.Mailboxes[actor];!ok{return errors.New("missing approved actor mailbox")}}
+  if _,err:=NewIMAPOTP(cfg.Mailboxes,KeyringSecrets{});err!=nil{return err}
+ }else if len(cfg.Mailboxes)!=0{return errors.New("mailboxes supplied while email OTP mode is disabled")}
  return nil
 }
 func fieldForRole(fields []DiscoveredField,role string)string{
