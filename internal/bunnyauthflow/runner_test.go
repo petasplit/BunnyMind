@@ -16,7 +16,7 @@ func TestSafeAutonomousSignupOTPAndSessions(t *testing.T){
  r.MailMessagesRead!=3||r.OTPCodesSubmitted!=3||r.EmailChallengeTicketsCompleted!=2||
  !r.OTPReplayDenied||!r.DistinctSessions||!r.OwnerAccessObserved||
  !r.AnonymousDenied||r.ForeignAccessObserved||!r.RotationInvalidatedOld||
- !r.LogoutInvalidated||r.RequestCount>MaxCalls{t.Fatalf("unexpected workflow %+v",r)}
+ !r.LogoutInvalidated||r.AccessComparison!="peer_access_denied"||r.RequestCount>MaxCalls{t.Fatalf("unexpected workflow %+v",r)}
 }
 func TestDeliberatelyWeakLocalAuthorizationDetected(t *testing.T){
  ctx,cancel:=context.WithTimeout(context.Background(),10*time.Second)
@@ -24,7 +24,7 @@ func TestDeliberatelyWeakLocalAuthorizationDetected(t *testing.T){
  out,err:=Run(ctx,true)
  if err!=nil{t.Fatal(err)}
  if out.Outcome!="cross_user_access_observed_in_synthetic_lab"||
- !out.ForeignAccessObserved||!out.AnonymousDenied{t.Fatalf("%+v",out)}
+ !out.ForeignAccessObserved||!out.AnonymousDenied||out.AccessComparison!="cross_identity_candidate"{t.Fatalf("%+v",out)}
 }
 func TestOutputsNeverContainOTPsTokensOrMail(t *testing.T){
  out,err:=Run(context.Background(),false);if err!=nil{t.Fatal(err)}

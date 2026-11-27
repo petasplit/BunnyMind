@@ -34,6 +34,7 @@ func init() {
 		researchNextStepTool{},
 		explorationTimelineTool{},
 		harContextInventoryTool{},
+		authAccessMatrixTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
