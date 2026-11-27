@@ -178,8 +178,7 @@ func (s *Store) Append(session string,e Entry) (Event,error) {
 	if err:=os.MkdirAll(s.Root,0700);err!=nil{return Event{},err}
 	f,err:=os.OpenFile(path,os.O_CREATE|os.O_WRONLY|os.O_APPEND,0600)
 	if err!=nil{return Event{},err}
-	if _,err=f.Write(append(line,'
-'));err!=nil{f.Close();return Event{},err}
+	if _,err=f.Write(append(line,'\n'));err!=nil{f.Close();return Event{},err}
 	if err=f.Sync();err!=nil{f.Close();return Event{},err}
 	if err=f.Close();err!=nil{return Event{},err}
 	return v,nil
