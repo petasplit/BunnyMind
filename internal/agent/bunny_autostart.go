@@ -107,6 +107,7 @@ func securityActionStatus(name string)string{
  case "auth_access_matrix":return "Comparing test-account access evidence"
  case "auth_browser_lab":return "Testing isolated browser sign-in"
  case "approved_browser_auth":return "Running approved external sign-in workflow"
+ case "finding_focus":return "Reviewing recorded finding evidence"
  case "list_roles":return "Selecting specialists"
  case "delegate_task":return "Starting specialist inspection"
  case "report_finding","triage_finding":return "Recording finding evidence"
