@@ -11,7 +11,6 @@ import (
  "os"
  "os/signal"
  "strconv"
- "syscall"
  "time"
 )
 const Marker="BUNNYMIND_LAB_MARKER_12345"
@@ -30,7 +29,7 @@ func main(){
   w.WriteHeader(http.StatusForbidden);fmt.Fprint(w,"No marker for the synthetic control")
  })
  srv:=&http.Server{Handler:mux,ReadHeaderTimeout:5*time.Second}
- done,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM)
+ done,stop:=signal.NotifyContext(context.Background(),os.Interrupt)
  defer stop()
  go func(){<-done.Done();ctx,cancel:=context.WithTimeout(context.Background(),3*time.Second);defer cancel();_ = srv.Shutdown(ctx)}()
  fmt.Printf("Synthetic fixture available at http://127.0.0.1:%d (Ctrl+C to stop)\n",*port)
