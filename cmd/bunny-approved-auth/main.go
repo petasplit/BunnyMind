@@ -29,6 +29,8 @@ func (o operator) Authorize(_ context.Context,actor,kind string)error{
 func run()error{
  scopeFile:=flag.String("scope","","Operator-authored approved browser scope JSON")
  planFile:=flag.String("plan","","Operator-authored auth workflow JSON")
+ adaptiveFile:=flag.String("adaptive-config","","Operator-approved discovery mode and test personas JSON")
+ mailboxFile:=flag.String("mailbox","","Dedicated test mailbox IMAP config for trusted email OTP")
  guardFile:=flag.String("guard","","BunnyGuard engagement authorization JSON")
  secretRef:=flag.String("set-secret","","Store test-account secret in OS keyring as actor:key")
  headless:=flag.Bool("headless",false,"Run without a visible browser (only for flows without human challenges)")
@@ -46,20 +48,40 @@ func run()error{
   fmt.Fprintln(os.Stderr,"Stored secret reference in operating-system credential store.")
   return nil
  }
- if *scopeFile==""||*planFile==""||*guardFile==""{
-  return errors.New("all of --scope, --plan and --guard are required")
+ if *scopeFile==""||*guardFile==""{
+  return errors.New("--scope and --guard must specify trusted local policy files")
  }
- scope,plan,err:=bunnybrowserflow.LoadApprovedConfiguration(*scopeFile,*planFile,*guardFile)
- if err!=nil{return fmt.Errorf("approved browser configuration rejected: %w",err)}
  guard,err:=bunnyguard.New(*guardFile)
  if err!=nil{return errors.New("invalid BunnyGuard manifest")}
  ctx,cancel:=context.WithTimeout(context.Background(),10*time.Minute)
  defer cancel()
- result,err:=bunnybrowserflow.RunConfiguredApproved(
-  ctx,scope,plan,bunnybrowserflow.KeyringSecrets{},
-  operator{reader:bufio.NewReader(os.Stdin)},guard.Manifest(),*headless,
- )
- if err!=nil{return fmt.Errorf("approved browser workflow failed: %w",err)}
+ var result any
+ provider:=bunnybrowserflow.Secrets(bunnybrowserflow.KeyringSecrets{})
+ if *mailboxFile!=""{
+  mail,err:=bunnybrowserflow.LoadMailboxConfiguration(*mailboxFile)
+  if err!=nil{return fmt.Errorf("dedicated test inbox rejected: %w",err)}
+  composite,err:=bunnybrowserflow.NewTrustedMailboxSecrets(
+   mail,bunnybrowserflow.IMAPTransport{},bunnybrowserflow.KeyringSecrets{})
+  if err!=nil{return err}
+  provider=composite
+ }
+ if *adaptiveFile!=""{
+  if *planFile!=""{return errors.New("choose --adaptive-config OR --plan, not both")}
+  scope,err:=bunnybrowserflow.LoadApprovedScope(*scopeFile,*guardFile)
+  if err!=nil{return fmt.Errorf("adaptive scope rejected: %w",err)}
+  batch,err:=bunnybrowserflow.LoadAdaptiveBatch(*adaptiveFile)
+  if err!=nil{return fmt.Errorf("adaptive config rejected: %w",err)}
+  result,err=bunnybrowserflow.RunConfiguredAdaptive(ctx,scope,batch,provider,
+   operator{reader:bufio.NewReader(os.Stdin)},guard.Manifest(),*headless)
+  if err!=nil{return fmt.Errorf("adaptive auth workflow failed: %w",err)}
+ }else{
+  if *planFile==""{return errors.New("--plan or --adaptive-config is required")}
+  scope,plan,err:=bunnybrowserflow.LoadApprovedConfiguration(*scopeFile,*planFile,*guardFile)
+  if err!=nil{return fmt.Errorf("approved browser configuration rejected: %w",err)}
+  result,err=bunnybrowserflow.RunConfiguredApproved(ctx,scope,plan,provider,
+   operator{reader:bufio.NewReader(os.Stdin)},guard.Manifest(),*headless)
+  if err!=nil{return fmt.Errorf("approved browser workflow failed: %w",err)}
+ }
  output,err:=json.MarshalIndent(result,"","  ")
  if err!=nil{return errors.New("could not serialize redacted result")}
  fmt.Println(string(output))
