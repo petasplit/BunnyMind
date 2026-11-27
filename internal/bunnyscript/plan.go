@@ -6,6 +6,7 @@ import (
  "encoding/json"
  "errors"
  "fmt"
+ "io"
  "net"
  "net/url"
  "regexp"
@@ -144,7 +145,7 @@ func ValidateJSON(raw []byte,policy bunnyguard.Policy)(Plan,error){
  var p Plan
  if err:=decoder.Decode(&p);err!=nil{return Plan{},err}
  var rest any
- if err:=decoder.Decode(&rest);err==nil{return Plan{},errors.New("extra plan object forbidden")}
+ if err:=decoder.Decode(&rest);err!=io.EOF{return Plan{},errors.New("plan must contain one complete JSON object")}
  if err:=Validate(p,policy);err!=nil{return Plan{},err}
  return p,nil
 }
