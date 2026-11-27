@@ -6,7 +6,7 @@ This milestone implements two observable workflow capabilities from the BugBunny
 
 The security tool exploration_timeline can append an agent-declared event, read a filtered page, and return a summary. Every event has a session-local sequence, lane, action, state, optional parent sequence, task ID, asset ID and SHA-256 evidence reference. Entries persist as owner-only JSONL with predecessor hashes and verification on replay. Invalid entries or a broken chain prevent future appends. Up to 10,000 entries are accepted per session.
 
-Successful scoped_read GET/HEAD calls automatically record tool-observed HTTP metadata: origin, opaque URL fingerprint, method, status, body digest, byte count and truncation flag. No credentials, raw URLs, query parameters, headers, cookies, or bodies are recorded in the timeline.
+Successful investigation_board plan/claim/complete/fail transitions also generate tool-observed task-state metadata. This records actual board operations, not independent exploitation proof. Successful scoped_read GET/HEAD calls automatically record tool-observed HTTP metadata: origin, opaque URL fingerprint, method, status, body digest, byte count and truncation flag. No credentials, raw URLs, query parameters, headers, cookies, or bodies are recorded in the timeline.
 
 The distinction matters: agent_declared "succeeded" means an agent assertion; tool_observed means a specific local tool executed successfully. Neither is independent proof of a vulnerability. The hash chain is tamper-evident but not a signed independent attestation, and this journal is intended for a single writer process.
 
