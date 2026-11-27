@@ -32,7 +32,12 @@ func TestChromeScopedPopupNavigationAndRestore(t *testing.T){
  _,err:=s.Eval(ctx,"document.querySelector('#launch').click()")
  if err!=nil{t.Fatal(err)}
  switched,err:=s.SwitchToApprovedPopup(ctx)
- if err!=nil||!switched{t.Fatalf("popup wasn't attached under scope: %v switched=%v",err,switched)}
+ if err!=nil||!switched{
+  if s.conn!=nil{
+   if raw,e:=s.conn.send(ctx,"","Target.getTargets",nil);e==nil{t.Logf("CDP local test target inventory: %s",raw)}
+  }
+  t.Fatalf("popup wasn't attached under scope: %v switched=%v",err,switched)
+ }
  title,err:=s.Title(ctx)
  if err!=nil||title!="SSO Popup"{t.Fatalf("popup title %q error %v",title,err)}
  if err:=s.RestoreMainPage();err!=nil{t.Fatal(err)}
