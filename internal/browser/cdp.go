@@ -207,6 +207,9 @@ type Options struct {
  ExternalProxyURL string
  ExternalMaxRequests int
  ExternalMinIntervalMS int
+ // VirtualPasskey enables a WebAuthn test authenticator only for expressly
+ // permitted test-account environments. This is NOT a hardware-backed key.
+ VirtualPasskey bool
  // LoopbackOrigin, when set, isolates the new browser session to this exact
  // numeric-loopback HTTP origin with request-stage CDP interception. Intended
  // exclusively for disposable local fixtures, never for public-host testing.
