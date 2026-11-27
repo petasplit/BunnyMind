@@ -105,7 +105,7 @@ func Draft(root string,s Spec,idea Idea,policy bunnyguard.Policy)(DraftSummary,e
  seed:=fmt.Sprintf("%s|%s|%d|%d",s.CampaignID,idea.Theme,idea.CandidateIndex,idea.ControlIndex)
  h:=sha256.Sum256([]byte(seed))
  id:="idea_"+hex.EncodeToString(h[:8])
- runID:=s.CampaignID+"_"+id
+ runID:=s.CampaignID+"_h"+hex.EncodeToString(h[:4])
  p:=ideaPlan(s,idea,runID)
  if err:=bunnyscript.Validate(p,policy);err!=nil{return DraftSummary{},err}
  script,err:=bunnyscript.Generate(p)
