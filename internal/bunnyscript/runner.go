@@ -35,6 +35,9 @@ type Runner struct{
  // BudgetReserved is set only by the parent adaptive campaign after it
  // has atomically reserved the entire maximum network budget.
  BudgetReserved bool
+ // ExecutionLeaseHeld indicates the trusted parent campaign owns the
+ // cross-process engagement lease for this entire Python script run.
+ ExecutionLeaseHeld bool
 }
 type observation struct {
  SampleID string `json:"sample_id"`
@@ -136,6 +139,11 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  root:=runner.Root
  if root==""{return EvidenceSummary{},errors.New("explicit evidence destination required")}
  if len(root)>2048{return EvidenceSummary{},errors.New("evidence path too long")}
+ if !runner.ExecutionLeaseHeld{
+  release,err:=bunnyquota.ExecutionLease(ctx,root,p.EngagementID)
+  if err!=nil{return EvidenceSummary{},fmt.Errorf("shared Python execution lease denied: %w",err)}
+  defer release()
+ }
  if !runner.BudgetReserved{
   if _,err:=bunnyquota.Reserve(ctx,root,p.EngagementID,len(p.Cases),policy.MaxNetworkCalls);err!=nil{
    return EvidenceSummary{},fmt.Errorf("shared engagement request budget denied: %w",err)
