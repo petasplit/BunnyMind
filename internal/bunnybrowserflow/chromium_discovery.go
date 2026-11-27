@@ -13,16 +13,13 @@ import (
 const authDiscoveryScript = `(() => {
  const visible = el => !!el && !el.disabled && el.getClientRects().length > 0 &&
    getComputedStyle(el).visibility !== 'hidden';
- const safeRef = (el, kind, index) => {
-   let id = 'bm-auto-' + kind + '-' + index;
-   let suffix = 0;
-   while (document.getElementById(id) && document.getElementById(id) !== el && suffix < 20) {
-     suffix++;
-     id = 'bm-auto-' + kind + '-' + (index + suffix);
-   }
-   if (suffix >= 20) return '';
-   el.id = id;
-   return '#' + id;
+ const safeRef = (el,kind,index) => {
+   const token = 'bm-auto-' + kind + '-' + index;
+   const selector = '[data-bm-auth="' + token + '"]';
+   const previous = document.querySelector(selector);
+   if (previous && previous !== el) return '';
+   el.setAttribute('data-bm-auth',token);
+   return selector;
  };
  const fields = [];
  const kinds = {};
