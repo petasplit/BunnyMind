@@ -16,6 +16,7 @@ import (
 
 const MaxCases=24
 var validID=regexp.MustCompile(`^[a-zA-Z0-9_-]{1,48}$`)
+func ValidRunID(s string)bool{return validID.MatchString(s)}
 var validPersona=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 type Case struct{
  SampleID string `json:"sample_id"`
