@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enowdev/antares/internal/bunnyguard"
 	"github.com/enowdev/antares/internal/llm"
 	"github.com/enowdev/antares/internal/plugin"
 	"github.com/enowdev/antares/internal/store"
@@ -169,6 +170,19 @@ func (a *Agent) executeTools(
 			if hook.Arguments != "" {
 				call.Arguments = hook.Arguments
 			}
+		}
+
+
+		// BunnyMind: opt-in tool-call preflight after plugin argument rewrites.
+		decision := bunnyguard.GateFromEnv(sess.ID, call.Name, call.Arguments)
+		if !decision.Allowed {
+			content := "engagement policy refused tool call: " + decision.Reason
+			outcomes[i] = toolOutcome{
+				message: llm.Message{Role: llm.RoleTool, ToolCallID: call.ID, Name: call.Name, Content: content},
+				isError: true,
+			}
+			_ = safeEmit(Event{Type: EventToolResult, ID: call.ID, Name: call.Name, Content: content, IsError: true})
+			return
 		}
 
 		workspace := sess.Workspace

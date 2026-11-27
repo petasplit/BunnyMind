@@ -70,7 +70,7 @@ func Default() *Config {
 			WrapUntrustedOutput:         true, SmartTitles: true,
 		},
 		Tools: Tools{
-			Toolset: "default", ApprovalMode: "auto", MaxOutputChars: 60000,
+			Toolset: "default", ApprovalMode: "prompt", MaxOutputChars: 60000,
 			Timeouts: map[string]int{
 				"terminal": 300, "web_fetch": 60, "web_search": 30,
 				// VPS tools allow up to 900s per call; keep the agent envelope above that.
@@ -93,9 +93,9 @@ func Default() *Config {
 		Terminal: Terminal{
 			Backend: "local", CWD: "~/antares-workspace", Timeout: 300,
 			HomeMode: "workspace", LifetimeSeconds: 3600, Shell: "",
-			Sandbox:         "none",
+			Sandbox:         "auto",
 			BlockedCommands: []string{"rm -rf /", "mkfs", ":(){:|:&};:", "shutdown", "reboot"},
-			AllowNetwork:    true, DockerImage: "debian:bookworm-slim",
+			AllowNetwork:    false, DockerImage: "debian:bookworm-slim",
 		},
 		Compression: Compression{
 			Enabled: true, ProgressNotices: true, Threshold: 0.8, TargetRatio: 0.5,
