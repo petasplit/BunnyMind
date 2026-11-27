@@ -10,6 +10,7 @@ import (
  "errors"
  "fmt"
  "net/url"
+ "net"
  "os"
  "path/filepath"
  "strings"
@@ -22,6 +23,7 @@ const EnvPolicy = "ANTARES_BUNNY_GUARD_POLICY"
 type Policy struct {
  EngagementID string `json:"engagement_id"`
  AllowedOrigins []string `json:"allowed_origins"`
+ AllowedCIDRs []string `json:"allowed_cidrs,omitempty"`
  AllowedMethods []string `json:"allowed_methods,omitempty"`
  MaxNetworkCalls int `json:"max_network_calls"`
  MinIntervalMS int `json:"min_interval_ms,omitempty"`
@@ -75,6 +77,12 @@ func New(path string) (*Guard,error) {
  if strings.TrimSpace(p.EngagementID)=="" || len(p.AllowedOrigins)==0{return nil,errors.New("engagement_id and allowed_origins required")}
  if p.MaxNetworkCalls<1 || p.MaxNetworkCalls>100000 {return nil,errors.New("invalid request budget")}
  if p.MinIntervalMS<0 || p.MinIntervalMS>3600000 {return nil,errors.New("invalid minimum interval")}
+ if len(p.AllowedCIDRs)>16{return nil,errors.New("too many CIDR exceptions")}
+ for _,cidr:=range p.AllowedCIDRs{
+  _,block,err:=net.ParseCIDR(cidr)
+  if err!=nil{return nil,fmt.Errorf("invalid network exception %q",cidr)}
+  bits,_:=block.Mask.Size();if bits==0{return nil,errors.New("default-route exception forbidden")}
+ }
  g:=&Guard{policy:p,origins:map[string]bool{},methods:map[string]bool{}}
  for _,v:=range p.AllowedOrigins {
   o,err:=parsedOrigin(v,true);if err!=nil{return nil,fmt.Errorf("origin %s: %w",v,err)}
@@ -136,6 +144,8 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
  "methodology_status","list_roles","view_image":
   d=Decision{Allowed:true,Reason:"offline tool"}
  case "http_request","web_fetch":
+  d=Decision{Reason:"legacy HTTP tool unavailable in guarded mode; use scoped_read"}
+ case "scoped_read":
   network=true
   var m map[string]json.RawMessage
   if json.Unmarshal([]byte(args),&m)!=nil{d.Reason="invalid arguments";break}
@@ -144,7 +154,7 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   if method==""{method="GET"};method=strings.ToUpper(method)
   var err error;origin,err=parsedOrigin(dest,false)
   if err!=nil||!g.origins[origin]{d.Reason="URL outside approved origin"
-  }else if !g.methods[method]{d.Reason="HTTP method not authorized"
+  }else if (method!="GET"&&method!="HEAD")||!g.methods[method]{d.Reason="only approved GET/HEAD allowed"
   }else{d=Decision{Allowed:true,Reason:"approved HTTP request"}}
  }
  if network&&d.Allowed{
@@ -170,3 +180,6 @@ func GateFromEnv(session,tool,args string)Decision{
  return active.Evaluate(session,tool,args)
 }
 func VerifyAudit(path string)(int,error){g,err:=New(path);if err!=nil{return 0,err};return g.seq,nil}
+
+// Manifest returns a validated policy snapshot for the restricted HTTP reader.
+func (g *Guard) Manifest() Policy { return g.policy }

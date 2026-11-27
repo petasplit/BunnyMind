@@ -22,6 +22,7 @@ func init() {
 		browserTool{},
 		listRolesTool{},
 		evidenceReviewTool{},
+		scopedReadTool{},
 		investigationBoardTool{},
 		reportFindingTool{},
 		triageFindingTool{},
