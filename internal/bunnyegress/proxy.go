@@ -67,6 +67,9 @@ func New(c Config)(*Proxy,error){
  if p.dial==nil{p.dial=defaultDial}
  return p,nil
 }
+// PublicIP rejects special-use, internal, metadata and documentation ranges.
+// Used by the trusted IMAP connector to enforce the same public egress checks.
+func PublicIP(ip netip.Addr)bool{return !forbidden(ip)}
 func forbidden(ip netip.Addr)bool{
  if !ip.IsValid()||ip.Is4In6(){ip=ip.Unmap()}
  if !ip.IsValid()||ip.IsUnspecified()||ip.IsLoopback()||ip.IsPrivate()||
