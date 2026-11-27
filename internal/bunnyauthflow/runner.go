@@ -12,6 +12,8 @@ import (
  "net/url"
  "strings"
  "time"
+
+ "github.com/enowdev/antares/internal/bunnyidentity"
 )
 
 const MaxCalls=28
@@ -114,36 +116,69 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  if tr,ok:=client.client.Transport.(*http.Transport);ok{defer tr.CloseIdleConnections()}
  alice,err:=freshEmail();if err!=nil{return Outcome{},err}
  bob,err:=freshEmail();if err!=nil{return Outcome{},err}
- aliceToken,aliceResource,err:=client.create(ctx,box,alice);if err!=nil{return Outcome{},err}
- bobToken,bobResource,err:=client.create(ctx,box,bob);if err!=nil{return Outcome{},err}
- if aliceToken==bobToken||aliceResource==bobResource{return Outcome{},errors.New("synthetic identities not isolated")}
+ // The coordinator reads OTP messages internally and stores bearer tokens
+ // in a memory-only, role-scoped vault; no credential is returned by
+ // enrollment and no test-account data is exposed to the agent tool.
+ vault:=bunnyidentity.New()
+ defer vault.Close()
+ coordinator:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault}
+ a,err:=coordinator.Provision(ctx,"owner",alice);if err!=nil{return Outcome{},err}
+ b,err:=coordinator.Provision(ctx,"foreign",bob);if err!=nil{return Outcome{},err}
+ aliceResource,bobResource:=a.ResourceID,b.ResourceID
+ if aliceResource==bobResource{return Outcome{},errors.New("synthetic resources not isolated")}
+ distinct:=false
+ err=vault.Use("owner",func(ownerToken,_ string)error{
+  return vault.Use("foreign",func(foreignToken,_ string)error{
+   distinct=ownerToken!=foreignToken
+   return nil
+  })
+ })
+ if err!=nil||!distinct{return Outcome{},errors.New("synthetic sessions not isolated")}
+ // Trusted callbacks are the only place raw session tokens are supplied
+ // to the loopback HTTP transport. All tool results stay redacted.
+ fromVault:=func(actor,method,path string,payload any)(int,map[string]string,error){
+  var status int
+  var body map[string]string
+  err:=vault.Use(actor,func(token,_ string)error{
+   var requestErr error
+   status,body,requestErr=client.request(ctx,method,path,token,payload)
+   return requestErr
+  })
+  return status,body,err
+ }
  out:=Outcome{
   AccountsCreated:2,MailMessagesRead:2,OTPCodesSubmitted:2,
   DistinctSessions:true,Outcome:"inconclusive",
   Notes:"Synthetic localhost-only signup, trusted mailbox OTP extraction, bearer sessions, login, rotation and logout. No actual third-party account was created or accessed.",
  }
- st,owner,err:=client.request(ctx,"GET","/resource/"+aliceResource,aliceToken,nil)
+ st,owner,err:=fromVault("owner","GET","/resource/"+aliceResource,nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  ownerMarker:=owner["marker"]
  if len(ownerMarker)<24{return Outcome{},errors.New("no synthetic owner marker")}
  out.OwnerAccessObserved=true
- st,foreign,err:=client.request(ctx,"GET","/resource/"+aliceResource,bobToken,nil)
+ st,foreign,err:=fromVault("foreign","GET","/resource/"+aliceResource,nil)
  if err!=nil{return Outcome{},err}
  out.ForeignAccessObserved=(st==200&&foreign["marker"]==ownerMarker)
  foreignDenied:=st==403||st==404
  st,_,err=client.request(ctx,"GET","/resource/"+aliceResource,"",nil)
  if e:=mustStatus(st,401,err);e!=nil{return Outcome{},e}
  out.AnonymousDenied=true
- st,me,err:=client.request(ctx,"GET","/me",bobToken,nil)
+ st,me,err:=fromVault("foreign","GET","/me",nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  if me["resource_id"]!=bobResource{return Outcome{},errors.New("foreign test identity mixed with owner")}
- st,rotation,err:=client.request(ctx,"POST","/session/rotate",aliceToken,nil)
+ st,rotation,err:=fromVault("owner","POST","/session/rotate",nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  newAliceToken:=rotation["token"]
- if len(newAliceToken)<32||newAliceToken==aliceToken{return Outcome{},errors.New("rotation did not issue a fresh token")}
- st,_,err=client.request(ctx,"GET","/me",aliceToken,nil)
+ if len(newAliceToken)<32{return Outcome{},errors.New("rotation did not issue a fresh token")}
+ // Preserve one temporary token reference only to verify revocation;
+ // never place it in any result or log.
+ oldOwnerToken:=""
+ err=vault.Use("owner",func(token,_ string)error{oldOwnerToken=token;return nil})
+ if err!=nil{return Outcome{},err}
+ if err:=vault.Rotate("owner",oldOwnerToken,newAliceToken,15*time.Minute);err!=nil{return Outcome{},err}
+ st,_,err=client.request(ctx,"GET","/me",oldOwnerToken,nil)
  if e:=mustStatus(st,401,err);e!=nil{return Outcome{},e}
- st,_,err=client.request(ctx,"GET","/me",newAliceToken,nil)
+ st,_,err=fromVault("owner","GET","/me",nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  out.RotationInvalidatedOld=true
  st,_,err=client.request(ctx,"POST","/session/request","",mailRequest{Email:alice})
@@ -156,13 +191,25 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  out.OTPCodesSubmitted++
  if session["token"]==""||session["token"]==newAliceToken{return Outcome{},errors.New("login failed to establish a separate session")}
+ if err:=vault.Add("owner_login",session["token"],aliceResource,15*time.Minute);err!=nil{
+  return Outcome{},errors.New("synthetic re-login session could not be isolated")
+ }
+ st,_,err=fromVault("owner_login","GET","/me",nil)
+ if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
  st,_,err=client.request(ctx,"POST","/session/verify","",codeRequest{Email:alice,Code:code})
  if e:=mustStatus(st,401,err);e!=nil{return Outcome{},e}
  out.OTPReplayDenied=true
- st,_,err=client.request(ctx,"POST","/session/logout",bobToken,nil)
+ oldForeignToken:=""
+ err=vault.Use("foreign",func(token,_ string)error{oldForeignToken=token;return nil})
+ if err!=nil{return Outcome{},err}
+ st,_,err=fromVault("foreign","POST","/session/logout",nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
- st,_,err=client.request(ctx,"GET","/me",bobToken,nil)
+ vault.Revoke("foreign")
+ st,_,err=client.request(ctx,"GET","/me",oldForeignToken,nil)
  if e:=mustStatus(st,401,err);e!=nil{return Outcome{},e}
+ if err:=vault.Use("foreign",func(_, _ string)error{return nil});err==nil{
+  return Outcome{},errors.New("revoked synthetic persona remained available")
+ }
  out.LogoutInvalidated=true
  if out.ForeignAccessObserved {out.Outcome="cross_user_access_observed_in_synthetic_lab"
  }else if foreignDenied {out.Outcome="cross_user_denied_in_synthetic_lab"
