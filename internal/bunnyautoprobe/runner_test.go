@@ -14,6 +14,7 @@ import (
  "testing"
 
  "github.com/enowdev/antares/internal/bunnyartifact"
+ "github.com/enowdev/antares/internal/bunnyaudit"
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnyscript"
 )
@@ -67,9 +68,10 @@ func TestAdaptiveProofEscalatesOnlyToRepeatedObservation(t *testing.T){
  folder:=filepath.Join(out,s.CampaignID)
  for _,item:=range campaign.Runs{
   dir:=filepath.Join(folder,item.RunID)
-  for _,file:=range []string{"scenario.py","plan.json","validation.json","report.md","transcript.enc"}{
+  for _,file:=range []string{"scenario.py","plan.json","validation.json","report.md","transcript.enc","seal.json"}{
    if _,err:=os.Stat(filepath.Join(dir,file));err!=nil{t.Fatalf("missing %s/%s: %v",item.RunID,file,err)}
   }
+  if _,err:=bunnyaudit.VerifyRun(dir,key);err!=nil{t.Fatalf("authenticated proof round failed independent offline verification: %v",err)}
   raw,err:=bunnyartifact.Open(dir,"transcript","http_proof",key)
   if err!=nil||bunnyscript.SHA(raw)!=item.EvidenceSHA256{t.Fatal("encrypted transcript not verifiable")}
  }
