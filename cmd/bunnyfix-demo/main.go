@@ -12,8 +12,10 @@ import (
  "net/http"
  "net/http/httptest"
  "os"
+ "path/filepath"
 
  "github.com/enowdev/antares/internal/bunnyauthz"
+ "github.com/enowdev/antares/internal/bunnybuild"
  "github.com/enowdev/antares/internal/bunnyfix"
  "github.com/enowdev/antares/internal/bunnyreceipt"
 )
@@ -26,6 +28,7 @@ func testToken()(string,error){
 func main(){
  mode:=flag.String("mode","remediation","remediation, regression, persistent, or denied")
  jsonOnly:=flag.Bool("json",false,"emit machine-readable JSON only")
+ bound:=flag.Bool("build-bound",false,"sign and verify two distinct measured synthetic artifact files")
  flag.Parse()
  var firstExposed,secondExposed bool
  expected:=""
@@ -61,14 +64,47 @@ func main(){
  }
  beforePlan:=makePlan(beforeServer.URL,"before_build")
  afterPlan:=makePlan(afterServer.URL,"after_build")
+ var beforeBuild,afterBuild bunnybuild.Signed
+ if *bound{
+  dir,err:=os.MkdirTemp("","bunnymind-build-bound-*")
+  if err!=nil{fail(err)}
+  defer os.RemoveAll(dir)
+  beforePath:=filepath.Join(dir,"before-build.bin")
+  afterPath:=filepath.Join(dir,"after-build.bin")
+  // Explicitly illustrative file bytes. We do NOT claim the test server is
+  // executing these artifacts; the two receipts only prove the recorder
+  // measured these local files and attached their hashes.
+  if err:=os.WriteFile(beforePath,[]byte("synthetic-before-application-artifact"),0600);err!=nil{fail(err)}
+  if err:=os.WriteFile(afterPath,[]byte("synthetic-after-application-artifact"),0600);err!=nil{fail(err)}
+  beforeBuild,err=bunnybuild.MeasureAndSign(beforePath,beforePlan.EngagementID,beforePlan.RunID,private)
+  if err!=nil{fail(err)}
+  afterBuild,err=bunnybuild.MeasureAndSign(afterPath,afterPlan.EngagementID,afterPlan.RunID,private)
+  if err!=nil{fail(err)}
+  beforePlan.BuildSHA256=beforeBuild.Record.ArtifactSHA256
+  afterPlan.BuildSHA256=afterBuild.Record.ArtifactSHA256
+ }
  personas:=bunnyauthz.Tokens{Owner:owner,Foreign:foreign}
  before,err:=bunnyauthz.Record(context.Background(),beforePlan,private,personas)
  if err!=nil{fail(err)}
  after,err:=bunnyauthz.Record(context.Background(),afterPlan,private,personas)
  if err!=nil{fail(err)}
- result,err:=bunnyfix.Compare(public,bunnyfix.Pair{BeforePlan:beforePlan,
-  BeforeCapture:before,AfterPlan:afterPlan,AfterCapture:after})
- if err!=nil{fail(err)}
+ pair:=bunnyfix.Pair{BeforePlan:beforePlan,
+  BeforeCapture:before,AfterPlan:afterPlan,AfterCapture:after}
+ var result any
+ outcome:=""
+ if *bound {
+  assessed,err:=bunnyfix.CompareBuildBound(public,bunnyfix.BuildBoundPair{
+   Pair:pair,BeforeBuild:beforeBuild,AfterBuild:afterBuild,
+  })
+  if err!=nil{fail(err)}
+  result=assessed
+  outcome=assessed.Comparison.Outcome
+ }else{
+  assessed,err:=bunnyfix.Compare(public,pair)
+  if err!=nil{fail(err)}
+  result=assessed
+  outcome=assessed.Outcome
+ }
  data,err:=json.MarshalIndent(result,"","  ")
  if err!=nil{fail(err)}
  if !*jsonOnly{
@@ -76,7 +112,7 @@ func main(){
   fmt.Println("Warning: signer and both fixtures run in the same process. This is not production fix attestation.")
  }
  fmt.Println(string(data))
- if result.Outcome!=expected{
+ if outcome!=expected{
   fmt.Fprintln(os.Stderr,"synthetic remediation scenario did not match expected outcome")
   os.Exit(1)
  }

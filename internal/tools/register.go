@@ -29,6 +29,7 @@ func init() {
 		verifyLabReceiptsTool{},
 		assessAuthzReceiptsTool{},
 		compareAuthzFixTool{},
+		compareBuildBoundFixTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},

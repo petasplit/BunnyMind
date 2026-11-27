@@ -26,6 +26,7 @@ type Plan struct{
  Origin string `json:"origin"`
  ResourcePath string `json:"resource_path"`
  Marker string `json:"marker"`
+ BuildSHA256 string `json:"build_sha256,omitempty"`
 }
 // Tokens are provided by the separate trusted test recorder, never written
 // to a plan, the agent workspace, signed observation or result.
@@ -58,7 +59,7 @@ func (p Plan) labPlan(actor,caseSuffix string)bunnylab.Plan{
  }
  return bunnylab.Plan{
   EngagementID:p.EngagementID,RunID:p.RunID,CaseID:caseID,
-  Origin:p.Origin,Marker:p.Marker,Probes:samples,
+  Origin:p.Origin,Marker:p.Marker,BuildSHA256:p.BuildSHA256,Probes:samples,
  }
 }
 func Validate(p Plan)error{
@@ -138,7 +139,7 @@ func Assess(pub ed25519.PublicKey,p Plan,c Capture)(Assessment,error){
  marker:=bunnyreceipt.Dig(p.Marker)
  for _,bundle:=range []bunnyreceipt.Bundle{c.OwnerBundle,c.CrossUserBundle}{
   for _,r:=range bundle.Receipts{
-   if r.Observation.Origin!=p.Origin||r.Observation.MarkerSHA256!=marker{
+   if r.Observation.Origin!=p.Origin||r.Observation.MarkerSHA256!=marker||r.Observation.BuildSHA256!=p.BuildSHA256{
     return Assessment{},errors.New("signed samples use unexpected origin or marker")
    }
   }

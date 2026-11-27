@@ -87,3 +87,22 @@ func TestSignatureEncodingIsStrict(t *testing.T){
  b.Receipts[0].Signature="malformed"
  if _,err:=Verify(pub,b);err==nil{t.Fatal("bad signature accepted")}
 }
+
+func TestMixedSignedBuildHashesRejected(t *testing.T){
+ pub,priv,b:=fixture(t)
+ for i:=range b.Receipts{
+  changed:=b.Receipts[i].Observation
+  changed.BuildSHA256=strings.Repeat("a",64)
+  if i==1{changed.BuildSHA256=strings.Repeat("b",64)}
+  signed,err:=Sign(priv,changed)
+  if err!=nil{t.Fatal(err)}
+  b.Receipts[i]=signed
+ }
+ if _,err:=Verify(pub,b);err==nil{t.Fatal("signed bundle mixed multiple builds")}
+}
+func TestInvalidOptionalBuildHashRejected(t *testing.T){
+ _,priv,_:=fixture(t)
+ v:=example("sample","positive",true)
+ v.BuildSHA256="not-a-sha256"
+ if _,err:=Sign(priv,v);err==nil{t.Fatal("malformed build hash was accepted")}
+}
