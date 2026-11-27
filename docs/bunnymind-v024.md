@@ -72,6 +72,20 @@ go run ./cmd/bunny-approved-auth --guard guard.json --scope scope.json --plan pl
 
 Add `--headless` for flows without interactive challenges. In visible-browser mode, an `operator_handoff` step pauses for the human to resolve MFA, passkeys or anti-bot verification in the open browser, then requires an explicit local acknowledgement. No CAPTCHA, MFA, or anti-bot bypass is implemented. A one-time code may be stored as a trusted secret ref for a time-limited run, but the AI never reads or stores the raw code.
 
+## Agent-integrated operation
+
+To allow the security agent to run the same preapproved external workflow, configure these operator-owned environment variables **before** starting BunnyMind:
+
+```powershell
+$env:ANTARES_BUNNY_GUARD_POLICY = "C:\Audits\guard.json"
+$env:BUNNY_APPROVED_BROWSER_SCOPE = "C:\Audits\scope.json"
+$env:BUNNY_APPROVED_BROWSER_PLAN = "C:\Audits\plan.json"
+```
+
+Then the security agent can invoke `approved_browser_auth` **with no arguments**. Its tool implementation loads the trusted files, checks their scope against the BunnyGuard manifest, resolves stored test-account secrets from the operating-system credential store, and executes the approved browser sequence. It does not accept model-proposed target URLs, credentials, replacement plans, or exploit payloads.
+
+Interactive MFA/passkey/anti-bot steps request a genuine human handoff. This is not unrestricted account creation and will not automatically defeat anti-automation or verification controls.
+
 ## Current limits and risks
 
 - Only HTTPS origins on TCP port 443 are supported externally. On-prem, IP-private, localhost and non-default HTTPS ports remain blocked by the external proxy. The independent local lab still supports loopback fixtures.
