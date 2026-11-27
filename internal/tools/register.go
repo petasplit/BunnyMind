@@ -33,6 +33,7 @@ func init() {
 		authWorkflowLabTool{},
 		researchNextStepTool{},
 		explorationTimelineTool{},
+		harContextInventoryTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
