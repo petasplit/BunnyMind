@@ -15,6 +15,7 @@ import (
 // HTTPS CONNECT proxy plus the browser's CDP request-stage allowlist.
 type ApprovedChromiumFactory struct {
  Executable string
+ Headless bool
  ProxyURL string
  Scope ApprovedScope
 }
@@ -27,7 +28,7 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
  }
  if !approved{return nil,errors.New("external browser origin not approved")}
  s:=browser.New(browser.Options{
-  Executable:f.Executable,Headless:true,Width:1050,Height:720,
+  Executable:f.Executable,Headless:f.Headless,Width:1050,Height:720,
   ExternalOrigins:f.Scope.AllowedOrigins,ExternalPostPaths:f.Scope.ApprovedPostPaths,
   ExternalMaxRequests:f.Scope.MaxBrowserRequests,ExternalMinIntervalMS:f.Scope.MinIntervalMS,
   ExternalProxyURL:f.ProxyURL,
@@ -39,7 +40,7 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
 // trusted, prevalidated plan. The credentials remain in a trusted provider;
 // no challenge completion is synthesized or bypassed.
 func RunConfiguredApproved(ctx context.Context,scope ApprovedScope,plan Plan,
- provider Secrets,operator Handoff,manifest bunnyguard.Policy)(Result,error){
+ provider Secrets,operator Handoff,manifest bunnyguard.Policy,headless bool)(Result,error){
  if _,err:=ValidateApprovedScope(scope,manifest);err!=nil{return Result{},err}
  proxy,err:=bunnyegress.New(bunnyegress.Config{
   Origins:scope.AllowedOrigins,MaxTunnels:scope.MaxTunnels,
@@ -49,7 +50,7 @@ func RunConfiguredApproved(ctx context.Context,scope ApprovedScope,plan Plan,
  if err!=nil{return Result{},err}
  defer proxy.Close()
  factory:=ApprovedChromiumFactory{
-  Executable:os.Getenv("BUNNY_CHROME"),
+  Executable:os.Getenv("BUNNY_CHROME"),Headless:headless,
   ProxyURL:address,Scope:scope,
  }
  // Trust validation above is mandatory. The engine also validates every
