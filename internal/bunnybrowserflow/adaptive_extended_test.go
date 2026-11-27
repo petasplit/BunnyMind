@@ -43,6 +43,7 @@ func (b *extendedBrowser) Click(_ context.Context,selector string)error{
   if b.page==0 {b.url="https://idp.example/login";b.page=1}else if b.page==1{
    b.url="https://app.example/callback?code=private";b.page=5
   }
+ }else if b.kind=="magic"{b.page=1
  }else{b.page=5}
  return nil
 }
