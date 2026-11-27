@@ -41,6 +41,7 @@ func init() {
 		missionProfileTool{},
 		pythonProofRunTool{},
 		adaptivePythonProofTool{},
+		hypothesisDraftTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
