@@ -17,6 +17,7 @@ type ApprovedScope struct {
  EngagementID string `json:"engagement_id"`
  AllowedOrigins []string `json:"allowed_origins"`
  ApprovedPostPaths []string `json:"approved_post_paths"`
+ AllowVirtualPasskey bool `json:"allow_virtual_passkey,omitempty"`
  MaxBrowserRequests int `json:"max_browser_requests"`
  MaxTunnels int `json:"max_tunnels"`
  MinIntervalMS int `json:"min_interval_ms"`
