@@ -1,0 +1,48 @@
+name: BunnyMind Windows x64 build
+on:
+  push:
+    branches: ["bunnymind/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Build web dashboard
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+      - name: Embed web assets
+        run: |
+          mkdir -p internal/server/dist
+          cp -r web/dist/. internal/server/dist/
+      - name: Cross-compile Windows x64 executable
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
+          sha256sum dist/BunnyMind-windows-x64.exe > dist/SHA256SUMS.txt
+      - name: Upload test build (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BunnyMind-windows-x64-ci
+          path: |
+            dist/BunnyMind-windows-x64.exe
+            dist/SHA256SUMS.txt
+          retention-days: 7
