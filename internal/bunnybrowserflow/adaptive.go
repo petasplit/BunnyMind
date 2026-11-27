@@ -135,6 +135,7 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
   complete:=false
   magicConsumed:=false
   captchaWaits:=0
+  captchaClicked:=false
   for round:=1;round<=maxAdaptiveRounds;round++{
    if err:=ctx.Err();err!=nil{return Result{},err}
    var state AuthPageState
@@ -143,6 +144,11 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    }else{state,err=discovered.DiscoverAuth(ctx)}
    if err!=nil{return Result{},errors.New("auth form discovery failed")}
    if err:=validateDiscovery(state);err!=nil{return Result{},err}
+   if capture,ok:=b.(EvidenceScreenshotter);ok&&len(result.Screenshots)<64{
+    shot,e:=capture.RecordScreenshot(ctx,actor,stateScreenshotStage(state))
+    if e!=nil{return Result{},errors.New("encrypted authentication screenshot could not be saved")}
+    if shot.File!=""{result.Screenshots=append(result.Screenshots,shot)}
+   }
    if state.Ambiguous{return Result{},fmt.Errorf("ambiguous authentication actions for %s; operator review required",actor)}
    if cfg.PasskeyMode!=""&&cfg.PasskeyMode!="off"&&state.PasskeySelector!=""{
     before,_:=b.CurrentURL(ctx)
@@ -163,6 +169,15 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    if state.Challenge!=""{
     if state.Challenge=="anti_bot"&&((cfg.CaptchaTestMode&&state.CaptchaTestKey)||cfg.AllowNaturalCaptcha){
      if !state.CaptchaReady{
+      // Only official public test keys may receive an automated pointer
+      // click. Production challenges are never solved or spoofed here.
+      if cfg.CaptchaTestMode&&state.CaptchaTestKey&&!captchaClicked {
+       if clicker,ok:=b.(OfficialTestChallengeInteraction);ok{
+        clicked,e:=clicker.ClickOfficialTestChallenge(ctx)
+        if e!=nil{return Result{},errors.New("test CAPTCHA interaction failed")}
+        captchaClicked=clicked
+       }
+      }
       captchaWaits++
       if captchaWaits>3{return Result{},errors.New("approved CAPTCHA has not completed naturally; user or site-owner exemption required")}
       select{
@@ -257,13 +272,19 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    }
    beforeURL,_:=b.CurrentURL(ctx)
    if err:=b.Click(ctx,state.SubmitSelector);err!=nil{return Result{},errors.New("approved form submission failed")}
+   if capture,ok:=b.(EvidenceScreenshotter);ok&&len(result.Screenshots)<64{
+    shot,e:=capture.RecordScreenshot(ctx,actor,"after_submit")
+    if e!=nil{return Result{},errors.New("encrypted submission screenshot could not be saved")}
+    if shot.File!=""{result.Screenshots=append(result.Screenshots,shot)}
+   }
    current,err:=b.CurrentURL(ctx)
    if err!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("form navigation left approved scope")}
    seq:=len(result.Events)+1
    result.Events=append(result.Events,Event{Seq:seq,Actor:actor,Action:"discovered_form_submit",
     Outcome:"observed",EvidenceSHA256:adaptiveDigest(actor,signature,seq)})
    if recorder,ok:=b.(TrafficObserver);ok&&len(result.Traffic)<MaxTrafficReceipts{
-    receipts:=recorder.CaptureTraffic(ctx,actor,seq,allow)
+    receipts,e:=recorder.CaptureTraffic(ctx,actor,seq,allow)
+    if e!=nil{return Result{},errors.New("encrypted browser HTTP evidence capture failed")}
     remaining:=MaxTrafficReceipts-len(result.Traffic)
     if len(receipts)>remaining{receipts=receipts[:remaining]}
     result.Traffic=append(result.Traffic,receipts...)

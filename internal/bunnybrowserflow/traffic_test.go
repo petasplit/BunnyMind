@@ -61,9 +61,9 @@ func TestTrafficBoundedToMaxReceipts(t *testing.T){
 }
 
 type observingBrowser struct{fake}
-func (b *observingBrowser) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)[]TrafficReceipt{
+func (b *observingBrowser) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)([]TrafficReceipt,error){
  req:=[]browser.NetworkRequest{{URL:"https://staging.example/protected?private=never-echo",Method:"GET",Response:&browser.NetworkResponse{Status:200}}}
- return redactTraffic(actor,step,req,allowed)
+ return redactTraffic(actor,step,req,allowed),nil
 }
 type observingFactory struct{closed *int}
 func (f observingFactory) New(_ context.Context,actor,origin string)(Browser,error){

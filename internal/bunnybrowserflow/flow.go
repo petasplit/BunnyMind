@@ -5,6 +5,8 @@ package bunnybrowserflow
 
 import (
  "context"
+
+ "github.com/enowdev/antares/internal/bunnyartifact"
  "crypto/sha256"
  "encoding/hex"
  "errors"
@@ -71,6 +73,7 @@ type Result struct{
  StepsCompleted int `json:"steps_completed"`
  Events []Event `json:"events"`
  Traffic []TrafficReceipt `json:"traffic,omitempty"`
+ Screenshots []bunnyartifact.Receipt `json:"screenshots,omitempty"`
  NextChecks []NextCheck `json:"next_checks,omitempty"`
  Disclaimer string `json:"disclaimer"`
 }
@@ -216,10 +219,16 @@ func runTrusted(ctx context.Context,p Plan,factory Factory,secrets Secrets,opera
   if recorder,ok:=b.(TrafficObserver);ok&&len(result.Traffic)<MaxTrafficReceipts{
    allowedOrigins:=approved
    if allowedOrigins==nil{allowedOrigins=map[string]bool{origin:true}}
-   receipts:=recorder.CaptureTraffic(ctx,s.Actor,i+1,allowedOrigins)
+   receipts,e:=recorder.CaptureTraffic(ctx,s.Actor,i+1,allowedOrigins)
+   if e!=nil{return Result{},errors.New("configured HTTP evidence capture failed")}
    remaining:=MaxTrafficReceipts-len(result.Traffic)
    if len(receipts)>remaining{receipts=receipts[:remaining]}
    result.Traffic=append(result.Traffic,receipts...)
+  }
+  if capture,ok:=b.(EvidenceScreenshotter);ok&&len(result.Screenshots)<64{
+   shot,e:=capture.RecordScreenshot(ctx,s.Actor,s.Op)
+   if e!=nil{return Result{},errors.New("configured screenshot evidence capture failed")}
+   if shot.File!=""{result.Screenshots=append(result.Screenshots,shot)}
   }
   result.StepsCompleted++
  }

@@ -20,11 +20,13 @@ type TrafficReceipt struct {
  Status int `json:"status"`
  Outcome string `json:"outcome"`
  ReceiptSHA256 string `json:"receipt_sha256"`
+ EncryptedCapture string `json:"encrypted_capture,omitempty"`
+ CaptureSHA256 string `json:"capture_sha256,omitempty"`
 }
 // TrafficObserver is an optional browser capability. It never exposes raw
 // network bodies, URLs, headers, cookies or credentials to the agent runner.
 type TrafficObserver interface {
- CaptureTraffic(context.Context,string,int,map[string]bool)[]TrafficReceipt
+ CaptureTraffic(context.Context,string,int,map[string]bool)([]TrafficReceipt,error)
 }
 func redactTraffic(actor string,step int,requests []browser.NetworkRequest,allowed map[string]bool)[]TrafficReceipt{
  out:=[]TrafficReceipt{}
@@ -59,6 +61,16 @@ func redactTraffic(actor string,step int,requests []browser.NetworkRequest,allow
  }
  return out
 }
-func (d *chromeDriver) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)[]TrafficReceipt{
- return redactTraffic(actor,step,d.session.DrainNetwork(ctx),allowed)
+func (d *chromeDriver) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)([]TrafficReceipt,error){
+ requests:=d.session.DrainNetwork(ctx)
+ metadata:=redactTraffic(actor,step,requests,allowed)
+ artifact,err:=d.captureBrowserRaw(ctx,actor,step,requests,allowed)
+ if err!=nil{return nil,err}
+ if artifact.File!=""{
+  for i:=range metadata{
+   metadata[i].EncryptedCapture=artifact.File
+   metadata[i].CaptureSHA256=artifact.SHA256
+  }
+ }
+ return metadata,nil
 }
