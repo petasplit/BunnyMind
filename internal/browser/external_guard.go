@@ -146,7 +146,7 @@ func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
  });err!=nil{return fmt.Errorf("cannot activate external browser scope: %w",err)}
  // New popup pages attach frozen; each receives the same request gate before
  // navigating. The DNS-pinned local proxy also rejects offscope destinations.
- if _,err:=c.send(ctx,"","Target.setAutoAttach",map[string]any{
+ if _,err:=c.send(ctx,s.pageSess,"Target.setAutoAttach",map[string]any{
   "autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true,
  });err!=nil{return fmt.Errorf("cannot guard new browser tabs: %w",err)}
  return nil
