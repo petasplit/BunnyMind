@@ -3,8 +3,6 @@ package bunnybrowserflow
 import (
  "context"
  "errors"
- "fmt"
- "strings"
 
  "github.com/enowdev/antares/internal/bunnyguard"
 )
@@ -127,11 +125,7 @@ func RunAdaptiveApproved(ctx context.Context,c AdaptiveConfig,scope ApprovedScop
   }
   if otpSelector,ok:=snapshotField(snap,"otp");ok {
    if requestedOTP{result.Outcome="verification_pending";return result,nil}
-   if marker,ok:=secrets.(OTPSince);ok && !submitted{
-    // No email was requested by the browser yet.
-    _=marker
-    return result,nil
-   }
+   if !submitted{result.Outcome="verification_not_requested";return result,nil}
    code,err:=secrets.Resolve(ctx,c.Actor,"otp")
    if err!=nil||len(code)==0||len(code)>32{
     result.Outcome="trusted_mailbox_code_unavailable"
