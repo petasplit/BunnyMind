@@ -24,25 +24,39 @@ manually.
 
 Each trial supplies three independent sets:
 
-- ```proof_events```: case IDs for which the **lab** recorded the expected proof signal.
-- ```passed_controls```: case IDs for which the **lab** recorded the expected
+- `proof_events`: case IDs for which the **lab** recorded the expected proof signal.
+- `passed_controls`: case IDs for which the **lab** recorded the expected
   negative-control result.
-- ```reported```: case IDs actually claimed in the agent's final report.
+- `reported`: case IDs actually claimed in the agent's final report.
 
 A true positive requires **all three** for the same case. Reports with
 missing proof, missing control, or unknown case IDs are classified as
 unsupported. Reports containing the same claim multiple times are counted
 only once. Known cases not supported by the report are missed.
 
-```precision = supported / distinct_reported```
+`precision = supported / distinct_reported`
 
-```recall = supported / all_ground_truth_cases```
+`recall = supported / all_ground_truth_cases`
 
-```proof_coverage = lab_proofs / all_ground_truth_cases```
+`proof_coverage = lab_proofs / all_ground_truth_cases`
 
 A no-report trial has precision=0 and recall=0; this convention prevents
 a vacuous result from appearing perfect. Group-by-model aggregates are
 macro-means over complete trials, not an accuracy guarantee.
+
+
+## Signed scoring alternative (v0.10)
+
+`bunnybench-signed` consumes Ed25519-authenticated bundles from a separately
+operated v0.9 lab recorder. Unlike the simple `bunnybench` input, it does not
+accept self-declared proof events and negative-control success lists as
+standalone evidence. The scorer derives these gates from valid, pinned-key
+signed observation bundles, then applies the same precision/recall rubric.
+
+See [Signed benchmark scoring](BUNNYMIND_SIGNED_BENCHMARK.md) and
+[Signed evidence receipts](BUNNYMIND_SIGNED_RECEIPTS.md). Signing authenticates
+the recorder, **not the truth of the observation**, and is not independent
+reproduction of an exploit or proof of impact.
 
 ## Benchmark discipline
 
