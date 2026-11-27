@@ -39,8 +39,7 @@ func ValidateAdaptive(cfg AdaptiveConfig,scope ApprovedScope,manifest bunnyguard
   seen[actor]=true
  }
  if len(cfg.SuccessText)<4||len(cfg.SuccessText)>80||
-  strings.ContainsAny(cfg.SuccessText,"
-"){return errors.New("unique expected signed-in text is required")}
+  strings.ContainsAny(cfg.SuccessText,"\r\n"){return errors.New("unique expected signed-in text is required")}
  if scope.MaxBrowserRequests*len(cfg.Actors)>manifest.MaxNetworkCalls{
   return errors.New("aggregate adaptive browser request budget exceeds permission")
  }
