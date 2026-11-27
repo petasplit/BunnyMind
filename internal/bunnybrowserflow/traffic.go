@@ -5,6 +5,7 @@ import (
  "crypto/sha256"
  "encoding/hex"
  "net/url"
+ "strconv"
  "strings"
 
  "github.com/enowdev/antares/internal/browser"
