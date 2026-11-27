@@ -110,3 +110,15 @@ jobs:
             }
             Write-Host "PASS: signed local before/after mode $($case.Mode)"
           }
+          foreach ($case in $modes) {
+            $rawBound = & $fixExe -mode $case.Mode -build-bound -json
+            if ($LASTEXITCODE -ne 0) { throw "Build-bound fix demo failed for mode $($case.Mode)" }
+            $bound = ($rawBound -join "`n") | ConvertFrom-Json
+            if ($bound.comparison.outcome -ne $case.Expected -or
+                -not $bound.artifact_measurements_authenticated -or
+                $bound.deployment_identity_verified -or
+                $bound.before_artifact_sha256 -eq $bound.after_artifact_sha256) {
+              throw "Build-bound fix comparison did not enforce distinct signed artifacts for $($case.Mode)"
+            }
+            Write-Host "PASS: signed synthetic build-bound comparison $($case.Mode)"
+          }
