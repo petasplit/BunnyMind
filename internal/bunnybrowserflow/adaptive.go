@@ -58,7 +58,7 @@ func fieldForRole(fields []DiscoveredField,role string)string{
 func uniqueState(s AuthPageState)string {
  var parts []string
  for _,f:=range s.Fields{parts=append(parts,f.Role)}
- return s.Kind+"|"+strings.Join(parts,",")+"|"+s.SignupPath
+ return s.Kind+"|"+strings.Join(parts,",")+"|"+s.SignupPath+"|"+s.LoginPath
 }
 func adaptiveDigest(actor,action string,step int)string{
  h:=sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%d",actor,action,step)))
@@ -112,12 +112,23 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
     previous=""
     continue
    }
-   if cfg.Mode=="signup"&&state.Kind=="login"&&state.SignupPath!="" {
+   if cfg.Mode=="signup"&&(state.Kind=="login"||state.Kind=="unknown")&&state.SignupPath!="" {
     if err:=b.Navigate(ctx,origin+state.SignupPath);err!=nil{return Result{},errors.New("approved registration link failed")}
     current,e:=b.CurrentURL(ctx)
     if e!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("registration link left approved scope")}
     previous=""
     continue
+   }
+   if cfg.Mode=="login"&&(state.Kind=="unknown"||state.Kind=="signup")&&state.LoginPath!="" {
+    if err:=b.Navigate(ctx,origin+state.LoginPath);err!=nil{return Result{},errors.New("approved sign-in link failed")}
+    current,e:=b.CurrentURL(ctx)
+    if e!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("sign-in link left approved scope")}
+    previous=""
+    continue
+   }
+   if cfg.Mode=="signup"&&state.Kind=="login"&&!strings.Contains(cfg.StartPath,"signup")&&
+    !strings.Contains(cfg.StartPath,"register")&&state.SignupPath=="" {
+    return Result{},errors.New("registration action not identified; operator review required")
    }
    signature:=uniqueState(state)
    if signature==previous{return Result{},fmt.Errorf("authentication page did not advance for %s",actor)}
