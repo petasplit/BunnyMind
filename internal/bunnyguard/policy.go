@@ -159,6 +159,16 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
   }
+ case "python_adaptive_proof_run":
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="adaptive Python evidence runner accepts no model-proposed code, URLs or parameters"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_ADAPTIVE_PROOF_SPEC"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_PROOF_OUTPUT"))==""{
+   d.Reason="trusted adaptive spec or output root not configured"
+  }else{
+   d=Decision{Allowed:true,Reason:"operator-approved adaptive Python evidence study"}
+  }
  case "python_proof_run":
   network=true
   if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
