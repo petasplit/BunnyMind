@@ -32,5 +32,10 @@ func (s *Session) setupVirtualPasskey(ctx context.Context,c *conn,sessionID stri
  if json.Unmarshal(raw,&created)!=nil||created.AuthenticatorID==""{
   return errors.New("virtual authenticator returned no identifier")
  }
+ s.virtualReady.Store(true)
  return nil
 }
+
+// VirtualPasskeyReady indicates that a disposable test authenticator was
+// installed. This is not proof of a hardware-backed security key.
+func (s *Session) VirtualPasskeyReady()bool{return s.virtualReady.Load()}
