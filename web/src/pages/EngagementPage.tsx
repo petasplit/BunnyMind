@@ -172,6 +172,12 @@ export default function EngagementPage() {
           <DownloadSimple className="size-3.5" />
           <span className="hidden sm:inline">{t('engagement.downloadReport')}</span>
         </Button>
+        <Button variant="outline" size="sm" disabled={!active}
+          onClick={() => downloadFile('/engagement/sarif?session=' + encodeURIComponent(active),
+            'bunnymind-findings.sarif').catch(() => {})}
+          aria-label="Export findings as SARIF">
+          Export SARIF
+        </Button>
         <Button
           variant="outline"
           size="sm"
