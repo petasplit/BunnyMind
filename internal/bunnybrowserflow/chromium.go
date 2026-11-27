@@ -34,7 +34,7 @@ func jsQuoted(s string)string{
  return string(b)
 }
 func (d *chromeDriver) Fill(ctx context.Context,selector,value string)error{
- if !validSelector.MatchString(selector)||len(value)==0||len(value)>256{return errors.New("invalid trusted field input")}
+ if !(validSelector.MatchString(selector)||safeDiscoverySelector.MatchString(selector))||len(value)==0||len(value)>256{return errors.New("invalid trusted field input")}
  // Keep credential bytes out of injected JavaScript source: only the
  // operator-locked selector goes into JS, followed by a CDP text event.
  script:=fmt.Sprintf(`(() => {
@@ -53,7 +53,7 @@ func (d *chromeDriver) Fill(ctx context.Context,selector,value string)error{
  return nil
 }
 func (d *chromeDriver) Click(ctx context.Context,selector string)error{
- if !validSelector.MatchString(selector){return errors.New("invalid trusted selector")}
+ if !(validSelector.MatchString(selector)||safeDiscoverySelector.MatchString(selector)){return errors.New("invalid trusted selector")}
  script:=fmt.Sprintf(`(() => {
   const el=document.querySelector(%s);
   if(!el || el.disabled) return 'missing';

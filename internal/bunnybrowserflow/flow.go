@@ -71,6 +71,7 @@ type Result struct{
  StepsCompleted int `json:"steps_completed"`
  Events []Event `json:"events"`
  Traffic []TrafficReceipt `json:"traffic,omitempty"`
+ NextChecks []NextCheck `json:"next_checks,omitempty"`
  Disclaimer string `json:"disclaimer"`
 }
 
