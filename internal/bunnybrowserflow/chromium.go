@@ -66,8 +66,7 @@ func (d *chromeDriver) Click(ctx context.Context,selector string)error{
  return nil
 }
 func (d *chromeDriver) Contains(ctx context.Context,needle string)(bool,error){
- if needle==""||len(needle)>80||strings.ContainsAny(needle,"
-"){return false,errors.New("invalid assertion")}
+ if needle==""||len(needle)>80||strings.ContainsAny(needle,"\r\n"){return false,errors.New("invalid assertion")}
  script:=fmt.Sprintf(`(document.body && document.body.innerText.includes(%s)) ? 'yes' : 'no'`,jsQuoted(needle))
  out,err:=d.session.EvalString(ctx,script)
  if err!=nil{return false,errors.New("local assertion not available")}
