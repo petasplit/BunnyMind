@@ -85,6 +85,15 @@ func proxyCreds(raw string) (user, pass string, ok bool) {
 func (s *Session) Start(ctx context.Context) error {
  s.mu.Lock()
  defer s.mu.Unlock()
+ scoped:=len(s.opts.ExternalOrigins)>0||s.opts.ExternalProxyURL!=""
+ if scoped {
+  if s.opts.LoopbackOrigin!=""||s.opts.RemoteURL!=""||s.opts.Stealth||
+   s.opts.Proxy!=""||s.opts.UserDataDir!=""{
+    return errors.New("external scoped browser requires a fresh Chromium without remote debugger, stealth, or persistent profile")
+  }
+  if _,err:=externalProxyAddress(s.opts.ExternalProxyURL);err!=nil{return err}
+  if _,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests);err!=nil{return err}
+ }
  if s.opts.LoopbackOrigin!=""{
   if _,err:=parseLoopbackOrigin(s.opts.LoopbackOrigin);err!=nil{return err}
   if s.opts.RemoteURL!=""||s.opts.Proxy!=""||s.opts.Stealth||s.opts.UserDataDir!=""{
@@ -123,7 +132,14 @@ func (s *Session) Start(ctx context.Context) error {
 			"--window-size=" + strconv.Itoa(s.opts.Width) + "," + strconv.Itoa(s.opts.Height),
 			"about:blank",
 		}
-		if s.opts.Headless {
+		if scoped {
+   args=append(args,
+    "--proxy-server="+s.opts.ExternalProxyURL,
+    "--proxy-bypass-list=<-loopback>",
+    "--disable-quic",
+   )
+  }
+  if s.opts.Headless {
 			args = append([]string{"--headless=new", "--disable-gpu", "--hide-scrollbars"}, args...)
 		}
 
@@ -260,6 +276,12 @@ func (s *Session) Start(ctx context.Context) error {
 	}
  if s.opts.LoopbackOrigin!=""{
   if err:=s.configureLoopbackGuard(ctx,c);err!=nil{
+   s.killLocked()
+   return err
+  }
+ }
+ if scoped{
+  if err:=s.configureExternalGuard(ctx,c);err!=nil{
    s.killLocked()
    return err
   }
