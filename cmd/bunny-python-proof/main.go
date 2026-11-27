@@ -24,14 +24,29 @@ func run()error{
  python:=flag.String("python","","Optional Python 3 executable")
  initKey:=flag.Bool("init-key",false,"Create a new evidence encryption key in OS credential store")
  exportRun:=flag.String("export-run","","Existing run ID to decrypt locally for authorized triage")
+ exportScreenshot:=flag.String("export-screenshot","","Decrypt a saved encrypted browser screenshot by its artifact base name")
  confirm:=flag.Bool("confirm-sensitive",false,"Acknowledge decrypted evidence may contain cookies and private data")
  flag.Parse()
  if *initKey{
-  if *guardPath!=""||*planPath!=""||*exportRun!=""{return errors.New("key initialization must be separate")}
+  if *guardPath!=""||*planPath!=""||*exportRun!=""||*exportScreenshot!=""{return errors.New("key initialization must be separate")}
   return bunnyartifact.InitKey()
  }
  key,err:=bunnyartifact.ReadKey()
  if err!=nil{return err}
+ if *exportScreenshot!=""{
+  if !*confirm||*root==""{
+   return errors.New("screenshot export needs --out and --confirm-sensitive")
+  }
+  data,err:=bunnyartifact.Open(*root,*exportScreenshot,"screenshot",key)
+  if err!=nil{return err}
+  filename:=filepath.Join(*root,*exportScreenshot+".png")
+  fd,err:=os.OpenFile(filename,os.O_WRONLY|os.O_CREATE|os.O_EXCL,0600)
+  if err!=nil{return err}
+  if _,err:=fd.Write(data);err!=nil{fd.Close();os.Remove(filename);return err}
+  if err:=fd.Close();err!=nil{return err}
+  fmt.Println("Private screenshot exported locally:",filename)
+  return nil
+ }
  if *exportRun!=""{
   if !*confirm||*root==""||!bunnyscript.ValidRunID(*exportRun){
    return errors.New("sensitive export needs explicit --out, safe --export-run and --confirm-sensitive")
