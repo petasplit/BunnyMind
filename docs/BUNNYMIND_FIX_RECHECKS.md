@@ -64,3 +64,13 @@ and validates both eight-sample signed bundles in each scenario.
 The fixture and signing key run in the same demo process; these results
 illustrate the evidence pipeline and do **not** provide independent
 production remediation attestation.
+
+## Build-bound comparison (v0.15)
+
+A stricter `compare_build_bound_fix` tool accepts two signed measurements
+of distinct local artifact files. Every signed HTTP observation must identify
+the matching artifact SHA-256, and all samples must still meet the v0.14
+owner/foreign/anonymous controls. This authenticates the recorder's measured
+file bytes, not which artifact the responding server actually executed.
+
+See [BunnyMind build-bound evidence](BUNNYMIND_BUILD_BOUND.md).
