@@ -135,6 +135,7 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
   complete:=false
   magicConsumed:=false
   captchaWaits:=0
+  captchaClicked:=false
   for round:=1;round<=maxAdaptiveRounds;round++{
    if err:=ctx.Err();err!=nil{return Result{},err}
    var state AuthPageState
@@ -168,6 +169,15 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    if state.Challenge!=""{
     if state.Challenge=="anti_bot"&&((cfg.CaptchaTestMode&&state.CaptchaTestKey)||cfg.AllowNaturalCaptcha){
      if !state.CaptchaReady{
+      // Only official public test keys may receive an automated pointer
+      // click. Production challenges are never solved or spoofed here.
+      if cfg.CaptchaTestMode&&state.CaptchaTestKey&&!captchaClicked {
+       if clicker,ok:=b.(OfficialTestChallengeInteraction);ok{
+        clicked,e:=clicker.ClickOfficialTestChallenge(ctx)
+        if e!=nil{return Result{},errors.New("test CAPTCHA interaction failed")}
+        captchaClicked=clicked
+       }
+      }
       captchaWaits++
       if captchaWaits>3{return Result{},errors.New("approved CAPTCHA has not completed naturally; user or site-owner exemption required")}
       select{
