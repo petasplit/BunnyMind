@@ -35,7 +35,9 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
   ExternalProxyURL:f.ProxyURL,VirtualPasskey:f.VirtualPasskey,
  })
  if err:=s.Start(ctx);err!=nil{s.Stop();return nil,errors.New("scoped Chromium browser launch failed")}
- return &chromeDriver{session:s},nil
+ capture,err:=newCaptureVault(os.Getenv("BUNNY_BROWSER_CAPTURE_DIR"),f.Scope.EngagementID)
+ if err!=nil{s.Stop();return nil,errors.New("configured encrypted screenshot vault unavailable")}
+ return &chromeDriver{session:s,vault:capture},nil
 }
 // RunConfiguredApproved starts a DNS-pinning egress proxy and executes a
 // trusted, prevalidated plan. The credentials remain in a trusted provider;
