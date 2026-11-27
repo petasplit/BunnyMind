@@ -120,6 +120,26 @@ unchanged exposure, unchanged denial). A native Windows demo exercises all
 four scenarios. Both stages are **synthetic local tests**, not evidence of
 real-world pentesting superiority or verified production fixes.
 
+## v0.16/v0.17 — Identity workflow and feedback-aware research
+
+**v0.16 BunnyAuthFlow** performs an entire synthetic localhost signup flow:
+it creates two `example.test` identities, reads private in-memory mailbox
+messages, submits six-digit OTPs, obtains separate bearer sessions, tests
+session rotation/re-login/replay/logout and compares owner versus foreign
+versus anonymous resource access. It cannot sign up for third-party sites.
+
+**v0.17 BunnyResearch** classifies outcomes of bounded experiments and
+distinguishes intermediary/WAF blocks from application behavior. It prioritizes
+baseline and negative-control validity, identifies low-information repetition,
+and recommends independent reproduction rather than accepting a one-off
+indicator. Its optional random canary is harmless, not an obfuscated exploit.
+
+Neither module establishes an autonomous success advantage over another
+platform. The current research planner does not execute an LLM model or
+create exploit payloads. The next worthwhile work is connecting operator-
+approved staging registration adapters to the evidence recorder and running
+fixed, repeated comparisons against a real heuristic/model baseline.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
