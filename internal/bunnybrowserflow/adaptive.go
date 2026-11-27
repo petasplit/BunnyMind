@@ -161,6 +161,11 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    if state.ProviderSelector!=""&&len(state.Fields)==0{
     before,_:=b.CurrentURL(ctx)
     if err:=b.Click(ctx,state.ProviderSelector);err!=nil{return Result{},errors.New("approved SSO control could not be opened")}
+    if switcher,ok:=b.(PopupBrowser);ok{
+     if _,err:=switcher.SwitchToApprovedPopup(ctx);err!=nil{
+      return Result{},errors.New("scoped SSO popup could not be attached")
+     }
+    }
     signed,e:=awaitAuthProgress(ctx,b,discovered,uniqueState(state),before,cfg.SuccessText,allow,idpOrigins)
     if e!=nil{return Result{},e}
     current,e:=b.CurrentURL(ctx)
