@@ -154,7 +154,7 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
    d.Reason="approved browser does not accept target or credential arguments"
   }else if strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_SCOPE"))==""||
-   strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_PLAN"))==""{
+   (strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_PLAN"))==""&&strings.TrimSpace(os.Getenv("BUNNY_ADAPTIVE_AUTH_CONFIG"))==""){
    d.Reason="trusted browser scope and plan not configured"
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
