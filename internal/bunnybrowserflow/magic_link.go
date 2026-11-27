@@ -12,7 +12,7 @@ import (
 
 // Only links in an explicitly approved HTTPS origin and a declared endpoint
 // prefix may be used. Token-bearing URLs never enter agent-facing output.
-var magicURLPattern=regexp.MustCompile("https://[^\\s<>\"']{1,2048}")
+var magicURLPattern=regexp.MustCompile("https://[^\\s<>\"']+")
 
 func verifiedEnvelope(message *imap.Message,sender,recipient string,since time.Time) bool {
  if message==nil||message.Envelope==nil||message.Envelope.Date.Before(since.Add(-10*time.Second)){return false}
@@ -51,6 +51,7 @@ func extractVerifiedMagicLink(body,sender,recipient string,message *imap.Message
  matches:=magicURLPattern.FindAllString(body,16)
  seen:=map[string]bool{}
  for _,raw:=range matches{
+  if len(raw)>2048{continue}
   raw=strings.TrimRight(raw,".,;)]}!")
   if magicLinkAllowed(raw,allow,prefixes){seen[raw]=true}
  }
