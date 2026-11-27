@@ -81,3 +81,13 @@ func TestMinMaxLease(t *testing.T){
  if err:=v.Add("owner",first,"resource_1111",time.Second);err==nil{t.Fatal("tiny ttl accepted")}
  if err:=v.Add("owner",first,"resource_1111",31*time.Minute);err==nil{t.Fatal("oversize ttl accepted")}
 }
+
+func TestCannotShareTokenAcrossPersonas(t *testing.T){
+ v:=New();defer v.Close()
+ if err:=v.Add("owner",first,"resource_1111",time.Minute);err!=nil{t.Fatal(err)}
+ if err:=v.Add("foreign",first,"resource_2222",time.Minute);err==nil{t.Fatal("same session reused across personas")}
+ if err:=v.Add("foreign",second,"resource_2222",time.Minute);err!=nil{t.Fatal(err)}
+ if err:=v.Rotate("foreign",second,first,time.Minute);err==nil{t.Fatal("rotation hijacked owner's bearer token")}
+ view,_:=v.View("foreign")
+ if !view.HasSession||view.Generation!=1{t.Fatal("rejected rotation changed session")}
+}

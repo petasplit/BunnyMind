@@ -48,6 +48,15 @@ func valid(actor,token,resource string,ttl time.Duration)error{
  return nil
 }
 func wipe(b []byte){for i:=range b{b[i]=0}}
+func (v *Vault) usedByOther(actor,token string)bool{
+ now:=v.nowUTC()
+ for name,r:=range v.sessions{
+  if name!=actor&&now.Before(r.expires)&&equal(r.token,[]byte(token)){
+   return true
+  }
+ }
+ return false
+}
 func (v *Vault) nowUTC()time.Time{
  if v.now!=nil{return v.now().UTC()}
  return time.Now().UTC()
@@ -62,6 +71,7 @@ func (v *Vault) Add(actor,token,resource string,ttl time.Duration)error{
   return errors.New("identity already exists; use Rotate")
  }
  if len(v.sessions)>=MaxIdentities{return errors.New("synthetic identity budget exhausted")}
+ if v.usedByOther(actor,token){return errors.New("bearer token already belongs to a different synthetic identity")}
  v.sessions[actor]=&record{token:[]byte(token),resource:resource,
   expires:v.nowUTC().Add(ttl),generation:1}
  return nil
@@ -77,6 +87,7 @@ func (v *Vault) Rotate(actor,oldToken,newToken string,ttl time.Duration)error{
  if oldToken==newToken{return errors.New("session token did not change")}
  if err:=valid(actor,newToken,r.resource,ttl);err!=nil{return err}
  if !equal(r.token,[]byte(oldToken)){return errors.New("stale session rotation refused")}
+ if v.usedByOther(actor,newToken){return errors.New("rotated token belongs to a different synthetic identity")}
  wipe(r.token)
  r.token=[]byte(newToken)
  r.expires=v.nowUTC().Add(ttl)

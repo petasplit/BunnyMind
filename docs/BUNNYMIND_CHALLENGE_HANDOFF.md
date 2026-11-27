@@ -68,3 +68,11 @@ go test ./internal/bunnychallenge ./internal/bunnyauthflow ./internal/bunnyident
 Tests cover challenge expiry, failed attempts, replay, operator-signature
 verification, wrong-signer denial, absence of operator authority,
 cross-ticket approval reuse, secret-redacted status and ticket quotas.
+
+## Additional session-isolation guard
+
+The v0.19 branch also strengthens the memory-only synthetic session vault:
+a bearer token that is still active for one identity cannot be added to
+or rotated into another identity's session. An attempted token collision
+fails before mutating either session. Tests exercise both account creation
+and token rotation collisions.
