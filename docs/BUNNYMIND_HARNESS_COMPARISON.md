@@ -52,12 +52,21 @@ instrumentation before being treated as observations.
 Both additions have focused regression suites and are staged in draft PRs
 rather than merged to main.
 
+
+**v0.7 — BunnyBlackboard:** Structured observation records are shared by
+engagement rather than by Antares session. The board tracks a bounded,
+deduplicated ledger of short non-sensitive descriptions, source categories and
+claimed evidence hashes. A different session can request reproduction or
+reject an entry; no agent can promote it to a verified vulnerability directly.
+Session-based separation is not cryptographic identity verification, and
+separate Antares processes still lack cross-process locking.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
    browser/CDP, WebSocket, tool/plugin, subprocess and proxy egress paths.
-2. Shared engagement identity for independent subagents, with reliable claims,
-   lock coordination, and resume after process restarts.
+2. Authenticate engagement-wide reviewer identities, add process-safe locks,
+   and automatically link v0.7 observations to v0.4 task queues.
 3. Independently observed and authenticated evidence receipts with trace links
    to the original request/response and negative controls; replay on fixed code.
 4. Ingest v0.6 graph snapshots from trusted captures and source scans;

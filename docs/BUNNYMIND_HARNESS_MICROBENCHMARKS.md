@@ -7,6 +7,8 @@ Current workloads:
 - `BenchmarkBoardStatus64`: load and validate a persisted 64-task DAG.
 - `BenchmarkCompare1024Assets`: diff 1024 synthetic inventory assets with
   one changed fingerprint.
+- `BenchmarkSummary128`: load and validate 128 shared, synthetically authored
+  observation records with a 50-entry result cap.
 
 Run locally:
 ```sh
