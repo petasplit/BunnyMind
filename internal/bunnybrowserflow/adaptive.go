@@ -96,6 +96,7 @@ func RunAdaptiveApproved(ctx context.Context,c AdaptiveConfig,scope ApprovedScop
  visited:=map[string]bool{c.EntryPath:true}
  acted:=map[string]bool{}
  submitted:=false
+ emailStageCompleted:=false
  requestedOTP:=false
  for i:=0;i<MaxAdaptiveTransitions;i++{
   if ctx.Err()!=nil{return AdaptiveResult{},ctx.Err()}
@@ -125,7 +126,7 @@ func RunAdaptiveApproved(ctx context.Context,c AdaptiveConfig,scope ApprovedScop
   }
   if otpSelector,ok:=snapshotField(snap,"otp");ok {
    if requestedOTP{result.Outcome="verification_pending";return result,nil}
-   if !submitted{result.Outcome="verification_not_requested";return result,nil}
+   if !submitted&&!emailStageCompleted{result.Outcome="verification_not_requested";return result,nil}
    code,err:=secrets.Resolve(ctx,c.Actor,"otp")
    if err!=nil||len(code)==0||len(code)>32{
     result.Outcome="trusted_mailbox_code_unavailable"
@@ -149,7 +150,27 @@ func RunAdaptiveApproved(ctx context.Context,c AdaptiveConfig,scope ApprovedScop
    if !hasEmail{
     emailSelector,hasEmail=snapshotField(snap,"username")
    }
-   if !hasEmail||!hasPassword{
+   if hasEmail && !hasPassword && !emailStageCompleted{
+    action,ok:=snapshotAction(snap,c.Mode)
+    if !ok{action,ok=snapshotAction(snap,"login")}
+    if ok{
+     key:="email"
+     if _,isEmail:=snapshotField(snap,"email");!isEmail{key="username"}
+     identity,err:=secrets.Resolve(ctx,c.Actor,key)
+     if err!=nil||len(identity)==0||len(identity)>256{
+      return AdaptiveResult{},errors.New("trusted first-stage identity unavailable")
+     }
+     if err:=b.Fill(ctx,emailSelector,identity);err!=nil{return AdaptiveResult{},errors.New("first-stage identity fill failed")}
+     identity=""
+     if marker,ok:=secrets.(OTPSince);ok{marker.MarkCodeRequested(c.Actor)}
+     if err:=b.Click(ctx,action);err!=nil{return AdaptiveResult{},errors.New("approved email-first submission failed")}
+     emailStageCompleted=true
+     appendAdaptive(&result,c.Actor,"email_first_step_submitted")
+     captureAdaptive(ctx,&result,b,allowed)
+     continue
+    }
+   }
+   if (!hasEmail&&!emailStageCompleted)||!hasPassword{
     if link,ok:=snapshotLink(snap,c.Mode);ok&&!visited[link]&&len(visited)<3{
      visited[link]=true
      if err:=b.Navigate(ctx,start+link);err!=nil{return AdaptiveResult{},errors.New("approved auth link navigation failed")}
@@ -160,23 +181,25 @@ func RunAdaptiveApproved(ctx context.Context,c AdaptiveConfig,scope ApprovedScop
     result.Outcome="unknown_or_unsupported_auth_form"
     return result,nil
    }
-   identityKey:="email"
-   if _,ok:=snapshotField(snap,"email");!ok{identityKey="username"}
-   identity,err:=secrets.Resolve(ctx,c.Actor,identityKey)
-   if err!=nil{return AdaptiveResult{},errors.New("trusted test-account identity missing")}
-   password,err:=secrets.Resolve(ctx,c.Actor,"password")
-   if err!=nil{return AdaptiveResult{},errors.New("trusted test-account password missing")}
-   if len(identity)==0||len(identity)>256||len(password)==0||len(password)>256{
-    return AdaptiveResult{},errors.New("trusted account values exceed limits")
+   if hasEmail{
+    identityKey:="email"
+    if _,ok:=snapshotField(snap,"email");!ok{identityKey="username"}
+    identity,err:=secrets.Resolve(ctx,c.Actor,identityKey)
+    if err!=nil||len(identity)==0||len(identity)>256{return AdaptiveResult{},errors.New("trusted test-account identity missing")}
+    if err:=b.Fill(ctx,emailSelector,identity);err!=nil{return AdaptiveResult{},errors.New("account field entry failed")}
+    identity=""
    }
-   if err:=b.Fill(ctx,emailSelector,identity);err!=nil{return AdaptiveResult{},errors.New("account field entry failed")}
+   password,err:=secrets.Resolve(ctx,c.Actor,"password")
+   if err!=nil||len(password)==0||len(password)>256{
+    return AdaptiveResult{},errors.New("trusted test-account password missing")
+   }
    if err:=b.Fill(ctx,passSelector,password);err!=nil{return AdaptiveResult{},errors.New("password field entry failed")}
    if c.Mode=="signup"{
     if confirmation,ok:=snapshotField(snap,"confirm_password");ok{
      if err:=b.Fill(ctx,confirmation,password);err!=nil{return AdaptiveResult{},errors.New("password confirmation failed")}
     }
    }
-   identity="";password=""
+   password=""
    button,ok:=snapshotAction(snap,c.Mode)
    if !ok{result.Outcome="ambiguous_auth_submission";return result,nil}
    if marker,ok:=secrets.(OTPSince);ok{marker.MarkCodeRequested(c.Actor)}
