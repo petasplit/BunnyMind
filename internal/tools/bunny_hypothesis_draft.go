@@ -2,6 +2,8 @@ package tools
 
 import (
  "context"
+ "bytes"
+ "io"
  "encoding/json"
  "os"
  "strings"
@@ -31,8 +33,13 @@ func (hypothesisDraftTool) Schema()map[string]any{
  },"theme","candidate_index","control_index")
 }
 func (hypothesisDraftTool) Execute(_ context.Context,in Input)Result{
+ if len(in.Args)==0||len(in.Args)>1024{return Errorf("bounded structured hypothesis required")}
  var idea bunnyautoprobe.Idea
- if err:=in.Bind(&idea);err!=nil{return Errorf("invalid structured Python hypothesis")}
+ decoder:=json.NewDecoder(bytes.NewReader(in.Args))
+ decoder.DisallowUnknownFields()
+ if err:=decoder.Decode(&idea);err!=nil{return Errorf("invalid structured Python hypothesis")}
+ var extra any
+ if err:=decoder.Decode(&extra);err!=io.EOF{return Errorf("hypothesis must contain exactly one object")}
  policyPath:=strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))
  specPath:=strings.TrimSpace(os.Getenv(adaptiveProofSpecEnv))
  root:=strings.TrimSpace(os.Getenv(proofRootEnv))
