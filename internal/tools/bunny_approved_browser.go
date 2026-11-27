@@ -17,6 +17,7 @@ import (
 const (
  scopeEnv="BUNNY_APPROVED_BROWSER_SCOPE"
  planEnv="BUNNY_APPROVED_BROWSER_PLAN"
+ adaptiveEnv="BUNNY_ADAPTIVE_AUTH_CONFIG"
 )
 type approvedBrowserAuthTool struct{}
 func (approvedBrowserAuthTool) Name()string{return "approved_browser_auth"}
@@ -24,6 +25,7 @@ func (approvedBrowserAuthTool) Description()string{
  return "Execute only the local operator's preconfigured BunnyGuard-authorized HTTPS "+
  "browser-authentication plan against explicitly approved external origins, "+
  "using isolated Chromium test identities and OS-keyring secrets. "+
+ "Supports operator-configured adaptive form discovery and IMAP OTP via BUNNY_ADAPTIVE_AUTH_CONFIG. "+
  "No target URL, exploit payload, credential, or plan is accepted from model "+
  "arguments. Requires BUNNY_APPROVED_BROWSER_SCOPE and BUNNY_APPROVED_BROWSER_PLAN "+
  "to reference trusted local files; POST paths and request budgets are scope-enforced. "+
@@ -49,15 +51,30 @@ func (approvedBrowserAuthTool) Execute(ctx context.Context,in Input)Result{
  guardPath:=strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))
  scopePath:=strings.TrimSpace(os.Getenv(scopeEnv))
  planPath:=strings.TrimSpace(os.Getenv(planEnv))
- if guardPath==""||scopePath==""||planPath==""{
-  return Errorf("external authentication requires preconfigured BunnyGuard, scope and workflow files")
+ adaptivePath:=strings.TrimSpace(os.Getenv(adaptiveEnv))
+ if guardPath==""||scopePath==""{
+  return Errorf("external authentication requires preconfigured BunnyGuard and scope files")
  }
- scope,plan,err:=bunnybrowserflow.LoadApprovedConfiguration(scopePath,planPath,guardPath)
- if err!=nil{return Errorf("approved external auth configuration rejected: %v",err)}
+ if adaptivePath==""&&planPath==""{
+  return Errorf("external authentication requires either a static plan or operator-configured adaptive authentication")
+ }
+ if adaptivePath!=""&&planPath!=""{
+  return Errorf("choose exactly one operator-owned adaptive configuration or static plan")
+ }
  guard,err:=bunnyguard.New(guardPath)
  if err!=nil{return Errorf("external engagement manifest invalid")}
- result,err:=bunnybrowserflow.RunConfiguredApproved(ctx,scope,plan,bunnybrowserflow.KeyringSecrets{},
-  trustedHandoff{ask:in.AskUser},guard.Manifest(),false)
+ var result bunnybrowserflow.Result
+ if adaptivePath!=""{
+  scope,cfg,e:=bunnybrowserflow.LoadAdaptiveConfiguration(scopePath,adaptivePath,guardPath)
+  if e!=nil{return Errorf("adaptive external auth configuration rejected: %v",e)}
+  result,err=bunnybrowserflow.RunConfiguredAdaptive(ctx,scope,cfg,bunnybrowserflow.KeyringSecrets{},
+   trustedHandoff{ask:in.AskUser},guard.Manifest(),false)
+ }else{
+  scope,plan,e:=bunnybrowserflow.LoadApprovedConfiguration(scopePath,planPath,guardPath)
+  if e!=nil{return Errorf("approved external auth configuration rejected: %v",e)}
+  result,err=bunnybrowserflow.RunConfiguredApproved(ctx,scope,plan,bunnybrowserflow.KeyringSecrets{},
+   trustedHandoff{ask:in.AskUser},guard.Manifest(),false)
+ }
  if err!=nil{return Errorf("approved external browser flow could not complete: %v",err)}
  data,err:=json.MarshalIndent(result,"","  ")
  if err!=nil{return Errorf("browser result encoding failed")}
