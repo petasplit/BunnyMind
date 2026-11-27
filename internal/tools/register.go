@@ -40,6 +40,7 @@ func init() {
 		findingFocusTool{},
 		missionProfileTool{},
 		pythonProofRunTool{},
+		adaptivePythonProofTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
