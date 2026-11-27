@@ -20,7 +20,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Guard unit tests
-        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/bunnylab ./internal/bunnyauthz ./internal/bunnyfix ./internal/bunnybuild ./cmd/bunnybuild-attest ./cmd/bunnyauthz-demo ./cmd/bunnyfix-demo ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools -count=1 ./internal/bunnyauthflow ./internal/bunnyidentity ./internal/bunnychallenge ./cmd/bunny-authflow-demo ./internal/bunnyresearch ./internal/bunnytimeline ./internal/bunnyhar ./internal/bunnymatrix ./internal/bunnybrowserflow
+        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/bunnylab ./internal/bunnyauthz ./internal/bunnyfix ./internal/bunnybuild ./cmd/bunnybuild-attest ./cmd/bunnyauthz-demo ./cmd/bunnyfix-demo ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools -count=1 ./internal/bunnyauthflow ./internal/bunnyidentity ./internal/bunnychallenge ./cmd/bunny-authflow-demo ./internal/bunnyresearch ./internal/bunnytimeline ./internal/bunnyhar ./internal/bunnymatrix ./internal/bunnybrowserflow ./cmd/bunny-browser-auth-demo
       - name: Verify agent integration
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
@@ -47,3 +47,23 @@ jobs:
           name: bunny-harness-microbench
           path: bunny-harness-microbench.txt
           retention-days: 30
+
+  browser-auth-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+      - name: Verify browser network interception and private-persona OTP
+        env:
+          CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          go test ./internal/browser ./internal/bunnybrowserflow \
+            -run 'TestChromiumNetworkInterceptorBlocksOtherLocalPort|TestChromeLoopbackEmailAndSessionIsolation' \
+            -count=1 -timeout 210s -v
