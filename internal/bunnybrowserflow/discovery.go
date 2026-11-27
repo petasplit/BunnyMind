@@ -18,6 +18,7 @@ type AuthPageState struct {
  Fields []DiscoveredField `json:"fields"`
  SubmitSelector string `json:"submit_selector,omitempty"`
  SignupPath string `json:"signup_path,omitempty"`
+ LoginPath string `json:"login_path,omitempty"`
  Ambiguous bool `json:"ambiguous"`
  Challenge string `json:"challenge,omitempty"`
 }
@@ -30,6 +31,7 @@ var safeDiscoverySelector=regexp.MustCompile(`^#bm-auto-[a-z]+-[0-9]{1,3}$`)
 func validateDiscovery(d AuthPageState)error {
  if len(d.Fields)>8{return errors.New("too many authentication controls")}
  if d.SignupPath!=""&&!safePath(d.SignupPath){return errors.New("invalid signup link path")}
+ if d.LoginPath!=""&&!safePath(d.LoginPath){return errors.New("invalid login link path")}
  if d.SubmitSelector!=""&&!safeDiscoverySelector.MatchString(d.SubmitSelector){return errors.New("invalid discovered submit ref")}
  seen:=map[string]bool{}
  roles:=map[string]bool{"email":true,"username":true,"password":true,"password_confirm":true,"otp":true}
