@@ -83,9 +83,15 @@ func proxyCreds(raw string) (user, pass string, ok bool) {
 }
 
 func (s *Session) Start(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.started {
+ s.mu.Lock()
+ defer s.mu.Unlock()
+ if s.opts.LoopbackOrigin!=""{
+  if _,err:=parseLoopbackOrigin(s.opts.LoopbackOrigin);err!=nil{return err}
+  if s.opts.RemoteURL!=""||s.opts.Proxy!=""||s.opts.Stealth||s.opts.UserDataDir!=""{
+   return errors.New("loopback fixture requires a fresh local Chromium without proxy or persistent profile")
+  }
+ }
+ if s.started {
 		return nil
 	}
 
@@ -226,7 +232,7 @@ func (s *Session) Start(ctx context.Context) error {
 			s.killLocked()
 			return err
 		}
-		c.onEvent = func(method string, params json.RawMessage, sess string) {
+		c.setOnEvent(func(method string, params json.RawMessage, sess string) {
 			switch method {
 			case "Fetch.authRequired":
 				var ev struct {
@@ -250,8 +256,14 @@ func (s *Session) Start(ctx context.Context) error {
 					"requestId": ev.RequestID,
 				})
 			}
-		}
+		})
 	}
+ if s.opts.LoopbackOrigin!=""{
+  if err:=s.configureLoopbackGuard(ctx,c);err!=nil{
+   s.killLocked()
+   return err
+  }
+ }
 	_, _ = c.send(ctx, s.pageSess, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": s.opts.Width, "height": s.opts.Height, "deviceScaleFactor": 1, "mobile": false,
 	})
