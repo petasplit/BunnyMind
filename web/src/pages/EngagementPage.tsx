@@ -22,6 +22,7 @@ import { SearchSelect } from '@/components/ui/SearchSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Markdown } from '@/components/chat/Markdown'
 import { FindingChatPanel } from '@/components/engagement/FindingChatPanel'
+import { PythonProofPanel } from '@/components/engagement/PythonProofPanel'
 
 interface Phase {
   name: string
@@ -92,7 +93,7 @@ export default function EngagementPage() {
   const sessions = sessData?.sessions ?? []
   const [sessionID, setSessionID] = useState('')
   const active = sessionID || sessions[0]?.id || ''
-  const [tab, setTab] = useState<'overview' | 'raw'>('overview')
+  const [tab, setTab] = useState<'overview' | 'raw' | 'proofs'>('overview')
   const [toDelete, setToDelete] = useState<SessionRow | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -190,10 +191,11 @@ export default function EngagementPage() {
           <span className="hidden sm:inline">{t('common.delete')}</span>
         </Button>
       </div>
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'overview' | 'raw')}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'overview' | 'raw' | 'proofs')}>
         <TabsList>
           <TabsTrigger value="overview">{t('engagement.tabOverview')}</TabsTrigger>
           <TabsTrigger value="raw">{t('engagement.tabRaw')}</TabsTrigger>
+          <TabsTrigger value="proofs">Python evidence</TabsTrigger>
         </TabsList>
       </Tabs>
     </div>
@@ -212,6 +214,8 @@ export default function EngagementPage() {
       />
       {tab === 'raw' ? (
         <RawReport session={active} title={activeTitle} />
+      ) : tab === 'proofs' ? (
+        <PythonProofPanel />
       ) : (
         <Overview eng={eng} session={active} />
       )}
