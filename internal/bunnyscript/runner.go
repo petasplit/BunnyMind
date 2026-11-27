@@ -42,6 +42,7 @@ type observation struct {
  MarkerPresent bool `json:"marker_present"`
  Truncated bool `json:"truncated"`
  ObservedAt string `json:"observed_at"`
+ ContentSHA256 string `json:"content_sha256"`
  RequestB64 string `json:"request_b64"`
  ResponseB64 string `json:"response_b64"`
 }
@@ -91,6 +92,16 @@ func validateTrace(raw []byte,p Plan)(EvidenceSummary,error){
   cut:=bytes.Index(rs,[]byte("\r\n\r\n"))
   if cut<0{return EvidenceSummary{},errors.New("response capture lacks HTTP header boundary")}
   body:=rs[cut+4:]
+  if SHA(body)!=o.ContentSHA256{
+   return EvidenceSummary{},errors.New("recorded HTTP body hash differs from captured bytes")
+  }
+  lineEnd:=bytes.Index(rs,[]byte("\r\n"))
+  if lineEnd<0||!bytes.HasPrefix(rs[:lineEnd],[]byte("HTTP/1.1 "+strconv.Itoa(o.Status)+" ")){
+   return EvidenceSummary{},errors.New("reported HTTP status differs from captured response line")
+  }
+  if _,e:=time.Parse(time.RFC3339,o.ObservedAt);e!=nil{
+   return EvidenceSummary{},errors.New("observation timestamp is invalid")
+  }
   if bytes.Contains(body,[]byte(p.Marker))!=o.MarkerPresent{
    return EvidenceSummary{},errors.New("reported proof marker is not present in captured response")
   }
