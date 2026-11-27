@@ -126,7 +126,7 @@ func eventHash(e Event) (string,error) {
 }
 func blankSummary() Summary {
 	return Summary{LastSHA256:genesis,ByLane:map[string]int{},ByState:map[string]int{},
-		IntegrityOK:true,Disclaimer:"Timeline metadata is not vulnerability proof. agent_declared events are not tool-attested; tool_observed traffic records attest only to completed scoped reads."}
+		IntegrityOK:true,Disclaimer:"Timeline metadata is not vulnerability proof. agent_declared events are not tool-attested; tool_observed events attest only to the named local tool operation, not a finding."}
 }
 func (s *Store) readLocked(session string) ([]Event,Summary,error) {
 	path,err:=s.path(session);if err!=nil{return nil,Summary{},err}
