@@ -200,6 +200,10 @@ func (c *conn) takeEvents(method string) []json.RawMessage {
 
 // Options configure how a browser is started.
 type Options struct {
+ // LoopbackOrigin, when set, isolates the new browser session to this exact
+ // numeric-loopback HTTP origin with request-stage CDP interception. Intended
+ // exclusively for disposable local fixtures, never for public-host testing.
+ LoopbackOrigin string
 	// Executable overrides Chrome discovery.
 	Executable string
 	// UserDataDir persists cookies and logins between runs.
