@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>BunnyMind browser auth fixture</title></head>
+<body>
+  <h1>Disposable test-account login</h1>
+  <label>Email <input id="email" autocomplete="off" type="email"></label>
+  <label>Code <input id="code" autocomplete="off" inputmode="numeric"></label>
+  <button type="button" id="register">Register</button>
+  <button type="button" id="verify">Verify</button>
+  <button type="button" id="identity">Who am I?</button>
+  <button type="button" id="logout">Log out</button>
+  <p id="status">Ready</p>
+  <script>
+    async function send(endpoint, payload) {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      return response.ok;
+    }
+    const email = () => document.querySelector("#email").value;
+    const code = () => document.querySelector("#code").value;
+    const status = text => document.querySelector("#status").textContent = text;
+    document.querySelector("#register").onclick = async () =>
+      status(await send("/signup", {email:email()}) ? "Verification required" : "Registration denied");
+    document.querySelector("#verify").onclick = async () =>
+      status(await send("/verify", {email:email(), code:code()}) ? "Signed in" : "Verification denied");
+    document.querySelector("#identity").onclick = async () => {
+      const response = await fetch("/whoami", {credentials:"same-origin"});
+      const result = await response.json();
+      status(response.ok ? "Hello " + result.actor : "Not authenticated");
+    };
+    document.querySelector("#logout").onclick = async () =>
+      status(await send("/logout", {}) ? "Signed out" : "Logout denied");
+  </script>
+</body></html>
