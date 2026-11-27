@@ -159,6 +159,16 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
   }
+ case "python_proof_run":
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="Python proof runner accepts no model-provided target, code or plan"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_PROOF_PLAN"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_PROOF_OUTPUT"))==""{
+   d.Reason="trusted Python proof plan or output vault not configured"
+  }else{
+   d=Decision{Allowed:true,Reason:"operator-configured bounded Python evidence capture"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
