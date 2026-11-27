@@ -28,6 +28,7 @@ type Observation struct {
  CaseID string `json:"case_id"`
  SampleID string `json:"sample_id"`
  Kind string `json:"kind"`
+ Actor string `json:"actor,omitempty"`
  Method string `json:"method"`
  Origin string `json:"origin"`
  RequestSHA256 string `json:"request_sha256"`
@@ -63,6 +64,7 @@ func ValidObservation(o Observation)error{
  for _,v:=range []string{o.EngagementID,o.RunID,o.CaseID,o.SampleID}{
   if !id.MatchString(v){return errors.New("invalid engagement, run, case or sample ID")}
  }
+ if o.Actor!="" && !id.MatchString(o.Actor){return errors.New("invalid observation actor")}
  if o.Kind!="positive"&&o.Kind!="control"{return errors.New("kind must be positive or control")}
  if o.Method!="GET"&&o.Method!="HEAD"&&o.Method!="POST"{return errors.New("unsupported request method")}
  u,err:=url.Parse(o.Origin)
