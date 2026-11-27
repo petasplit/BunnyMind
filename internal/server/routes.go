@@ -278,6 +278,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/engagement/sessions", s.handleEngagementSessions)
 	m.HandleFunc("GET /api/engagement", s.handleEngagement)
 	m.HandleFunc("GET /api/engagement/report", s.handleEngagementReport)
+ m.HandleFunc("GET /api/engagement/finding-chat",s.handleFindingChat)
+ m.HandleFunc("POST /api/engagement/finding-chat",s.handleFindingChat)
 	m.HandleFunc("DELETE /api/engagement/{session}", s.handleEngagementDelete)
 	m.HandleFunc("GET /api/board/sessions", s.handleBoardSessions)
 	m.HandleFunc("GET /api/board", s.handleBoard)
