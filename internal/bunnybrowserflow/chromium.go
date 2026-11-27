@@ -15,7 +15,7 @@ import (
 type ChromiumFactory struct{
  Executable string
 }
-type chromeDriver struct{ session *browser.Session }
+type chromeDriver struct{ session *browser.Session; vault *screenshotVault }
 func (f ChromiumFactory) New(ctx context.Context,actor,origin string)(Browser,error){
  if _,err:=Origin(origin);err!=nil{return nil,err}
  s:=browser.New(browser.Options{
