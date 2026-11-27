@@ -32,6 +32,7 @@ func init() {
 		compareBuildBoundFixTool{},
 		authWorkflowLabTool{},
 		researchNextStepTool{},
+		explorationTimelineTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
