@@ -9,6 +9,7 @@ import (
  "sync"
 
  "github.com/enowdev/antares/internal/bunnyharness"
+ "github.com/enowdev/antares/internal/bunnytimeline"
  "github.com/enowdev/antares/internal/config"
 )
 
@@ -96,5 +97,30 @@ func (investigationBoardTool) Execute(_ context.Context,in Input)Result{
  if err!=nil{return Errorf("investigation board: %v",err)}
  b,err:=json.MarshalIndent(response,"","  ")
  if err!=nil{return Errorf("investigation board response: %v",err)}
- return Text(fmt.Sprintf("%s",b))
+ out:=Text(fmt.Sprintf("%s",b))
+ // Record only real, successful board state transitions. The digest is
+ // caller-provided evidence metadata, not an independently validated PoC.
+ var event *bunnytimeline.Entry
+ switch args.Action {
+ case "plan":
+  event=&bunnytimeline.Entry{Lane:"activity",Action:"map",State:"queued",Source:bunnytimeline.SourceTool}
+ case "claim":
+  if task,ok:=response.(bunnyharness.Task);ok{
+   event=&bunnytimeline.Entry{Lane:"exploration",Action:"test",State:"running",
+    Source:bunnytimeline.SourceTool,TaskID:task.ID}
+  }
+ case "complete":
+  event=&bunnytimeline.Entry{Lane:"exploration",Action:"test",State:"succeeded",
+   Source:bunnytimeline.SourceTool,TaskID:args.TaskID,EvidenceSHA256:args.EvidenceSHA256}
+ case "fail":
+  state:="failed";if args.FailureCode=="blocked"{state="blocked"}
+  event=&bunnytimeline.Entry{Lane:"exploration",Action:"test",State:state,
+   Source:bunnytimeline.SourceTool,TaskID:args.TaskID}
+ }
+ if event!=nil {
+  if _,err:=timelineStore().Append(in.SessionID,*event);err!=nil{
+   out.Meta=map[string]any{"timeline_warning":"board operation succeeded but telemetry persistence failed"}
+  }
+ }
+ return out
 }

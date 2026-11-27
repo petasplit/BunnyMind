@@ -2,12 +2,15 @@ package tools
 
 import (
  "context"
+ "crypto/sha256"
+ "encoding/hex"
  "encoding/json"
  "os"
  "strings"
 
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnynet"
+ "github.com/enowdev/antares/internal/bunnytimeline"
 )
 
 // scopedReadTool makes bounded GET/HEAD requests only under a validated
@@ -50,5 +53,23 @@ func (scopedReadTool) Execute(ctx context.Context,in Input) Result {
  if err!=nil{return Errorf("scoped read blocked or failed: %v",err)}
  payload,err:=json.MarshalIndent(result,"","  ")
  if err!=nil{return Errorf("cannot encode scoped read: %v",err)}
- return Text(string(payload))
+ // Preserve only metadata from the actual completed request, not the
+ // response preview, request URL, cookies, body, headers or session token.
+ // Timeline failures are visible but do not rewrite the observed HTTP result.
+ output:=Text(string(payload))
+ if strings.TrimSpace(in.SessionID)!="" {
+  opaque:=sha256.Sum256([]byte(args.URL))
+  method:=strings.ToUpper(strings.TrimSpace(args.Method))
+  if method=="" {method="GET"}
+  _,err:=timelineStore().Append(in.SessionID,bunnytimeline.Entry{
+   Lane:"traffic",Action:"request",State:"succeeded",
+   Source:bunnytimeline.SourceTool,
+   AssetID:"urlsha_"+hex.EncodeToString(opaque[:8]),
+   EvidenceSHA256:result.BodySHA256,
+   HTTPMethod:method,HTTPStatus:result.Status,Bytes:result.BytesRead,
+   Truncated:result.Truncated,Origin:result.Origin,
+  })
+  if err!=nil { output.Meta=map[string]any{"timeline_warning":"read succeeded but telemetry persistence failed"} }
+ }
+ return output
 }
