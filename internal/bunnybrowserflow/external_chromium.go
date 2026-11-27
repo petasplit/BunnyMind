@@ -16,6 +16,7 @@ import (
 type ApprovedChromiumFactory struct {
  Executable string
  Headless bool
+ VirtualPasskey bool
  ProxyURL string
  Scope ApprovedScope
 }
@@ -31,7 +32,7 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
   Executable:f.Executable,Headless:f.Headless,Width:1050,Height:720,
   ExternalOrigins:f.Scope.AllowedOrigins,ExternalPostPaths:f.Scope.ApprovedPostPaths,
   ExternalMaxRequests:f.Scope.MaxBrowserRequests,ExternalMinIntervalMS:f.Scope.MinIntervalMS,
-  ExternalProxyURL:f.ProxyURL,
+  ExternalProxyURL:f.ProxyURL,VirtualPasskey:f.VirtualPasskey,
  })
  if err:=s.Start(ctx);err!=nil{s.Stop();return nil,errors.New("scoped Chromium browser launch failed")}
  return &chromeDriver{session:s},nil
