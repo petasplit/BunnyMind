@@ -11,6 +11,7 @@ import (
  "io"
  "net/http"
  "net/http/httptest"
+ "os"
  "regexp"
  "sync"
  "time"
@@ -177,5 +178,5 @@ func RunLab(ctx context.Context)(Result,error){
  defer server.Close()
  timeout,cancel:=context.WithTimeout(ctx,2*time.Minute)
  defer cancel()
- return Run(timeout,LocalPlan(server.URL),ChromiumFactory{},fixtureSecrets{state},nil)
+ return Run(timeout,LocalPlan(server.URL),ChromiumFactory{Executable:os.Getenv("BUNNY_CHROME")},fixtureSecrets{state},nil)
 }
