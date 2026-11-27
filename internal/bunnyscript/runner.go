@@ -18,6 +18,7 @@ import (
  "github.com/enowdev/antares/internal/bunnyartifact"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyquota"
 )
 
 //go:embed runner.py
@@ -31,6 +32,9 @@ type Runner struct{
  Root string
  EncryptionKey []byte
  Secrets Secrets
+ // BudgetReserved is set only by the parent adaptive campaign after it
+ // has atomically reserved the entire maximum network budget.
+ BudgetReserved bool
 }
 type observation struct {
  SampleID string `json:"sample_id"`
@@ -132,6 +136,11 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  root:=runner.Root
  if root==""{return EvidenceSummary{},errors.New("explicit evidence destination required")}
  if len(root)>2048{return EvidenceSummary{},errors.New("evidence path too long")}
+ if !runner.BudgetReserved{
+  if _,err:=bunnyquota.Reserve(ctx,root,p.EngagementID,len(p.Cases),policy.MaxNetworkCalls);err!=nil{
+   return EvidenceSummary{},fmt.Errorf("shared engagement request budget denied: %w",err)
+  }
+ }
  if err:=os.MkdirAll(root,0700);err!=nil{return EvidenceSummary{},err}
  dir:=filepath.Join(root,p.RunID)
  if err:=os.Mkdir(dir,0700);err!=nil{return EvidenceSummary{},err}
