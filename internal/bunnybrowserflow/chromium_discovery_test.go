@@ -20,7 +20,7 @@ func TestChromeAuthDiscoveryLocal(t *testing.T){
  }
  markup:=`<!doctype html><html><head><title>Login</title></head><body>
  <form onsubmit="event.preventDefault();document.getElementById('result').textContent='Signed in';">
- <label>Email <input type="email" autocomplete="email" name="address"></label>
+ <label for="original-email">Email</label><input id="original-email" type="email" autocomplete="email" name="address">
  <label>Password <input type="password" autocomplete="current-password"></label>
  <button type="submit">Sign in</button>
  </form><div id="result"></div></body></html>`
@@ -37,7 +37,9 @@ func TestChromeAuthDiscoveryLocal(t *testing.T){
  if err:=driver.Navigate(ctx,server.URL);err!=nil{t.Fatal(err)}
  state,err:=driver.DiscoverAuth(ctx)
  if err!=nil{t.Fatal(err)}
- if state.Kind!="login"||state.Ambiguous||len(state.Fields)!=2||state.SubmitSelector==""{
+ preserved,err:=s.EvalString(ctx,"document.getElementById('original-email') ? 'yes' : 'no'")
+ if err!=nil||preserved!="yes"{t.Fatal("form discovery mutated an application-owned input ID")}
+  if state.Kind!="login"||state.Ambiguous||len(state.Fields)!=2||state.SubmitSelector==""{
   t.Fatalf("form not classified: %+v",state)
  }
  for _,field:=range state.Fields{
