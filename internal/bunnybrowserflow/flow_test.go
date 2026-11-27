@@ -3,7 +3,7 @@ package bunnybrowserflow
 import (
  "context"
  "encoding/json"
- "errors"
+ "os"
  "strings"
  "testing"
  "time"
@@ -97,7 +97,11 @@ type escapeBrowser struct{fake}
 func (f *escapeBrowser) Navigate(_ context.Context,u string)error{f.current="http://other.example/";return nil}
 
 func TestChromeLoopbackEmailAndSessionIsolation(t *testing.T){
- if _,err:=browser.FindExecutable("");err!=nil{t.Skip("Chromium unavailable:",err)}
+ path:=os.Getenv("BUNNY_CHROME")
+ if _,err:=browser.FindExecutable(path);err!=nil{
+  if path!=""{t.Fatal("configured browser missing:",err)}
+  t.Skip("Chromium unavailable:",err)
+ }
  ctx,cancel:=context.WithTimeout(context.Background(),110*time.Second)
  defer cancel()
  result,err:=RunLab(ctx)
@@ -105,7 +109,4 @@ func TestChromeLoopbackEmailAndSessionIsolation(t *testing.T){
  if result.Actors!=2||result.StepsCompleted!=18||result.Outcome!="completed_local_browser_fixture"{
   t.Fatalf("incomplete real browser authentication workflow: %+v",result)
  }
-}
-func TestOperatorCannotModifyUserCreatedEvidence(t *testing.T){
- _=errors.New // Keep missing imports under test when the fixture is platform-skipped.
 }
