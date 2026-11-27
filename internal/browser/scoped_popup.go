@@ -128,3 +128,29 @@ func (s *Session) RestoreMainPage()error{
  s.pageSess=s.parentSession
  return nil
 }
+
+// ParentHasText tests a post-SSO success indicator in the original app tab
+// without exposing its text or cookies. If the expected indicator is present,
+// it restores the original tab as the active context.
+func (s *Session) ParentHasText(ctx context.Context,needle string)(bool,error){
+ if len(needle)<4||len(needle)>80{return false,errors.New("invalid parent success indicator")}
+ s.mu.Lock()
+ conn,main,current:=s.conn,s.parentSession,s.pageSess
+ s.mu.Unlock()
+ if conn==nil||main==""||main==current{return false,nil}
+ encoded,_:=json.Marshal(needle)
+ expression:="(document.body && document.body.innerText.includes("+string(encoded)+"))"
+ raw,err:=conn.send(ctx,main,"Runtime.evaluate",map[string]any{
+  "expression":expression,"returnByValue":true,
+ })
+ if err!=nil{return false,errors.New("parent page verification unavailable")}
+ var result struct{
+  Result struct{Value bool `json:"value"`} `json:"result"`
+ }
+ if json.Unmarshal(raw,&result)!=nil{return false,errors.New("invalid parent page result")}
+ if result.Result.Value{
+  _=s.RestoreMainPage()
+  return true,nil
+ }
+ return false,nil
+}
