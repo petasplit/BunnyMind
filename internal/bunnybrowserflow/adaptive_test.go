@@ -114,3 +114,24 @@ func TestSnapshotOnlyAcceptsStructuralSelectors(t *testing.T){
   if err:=validateAuthSnapshot(snap);err==nil{t.Fatalf("unsafe selector accepted %q",selector)}
  }
 }
+
+func TestAdaptiveTwoStageEmailFirstLogin(t *testing.T){
+ closed:=0
+ b:=&adaptiveBrowser{closeCount:&closed,snaps:[]AuthSnapshot{
+  {Fields:[]AuthField{{Selector:"#email",Kind:"email"}},
+   Actions:[]AuthAction{{Selector:"#continue",Kind:"login"}}},
+  {Fields:[]AuthField{{Selector:"#pass",Kind:"password"}},
+   Actions:[]AuthAction{{Selector:"#signin",Kind:"login"}}},
+  {SignedIn:true},
+ }}
+ result,err:=RunAdaptiveApproved(context.Background(),AdaptiveConfig{
+  Actor:"owner",Mode:"login",EntryPath:"/",
+ },sampleScope(),adaptiveFactory{b},&adaptiveSecrets{},nil,approvedManifest())
+ if err!=nil{t.Fatal(err)}
+ if result.Outcome!="sign_in_indicator_observed"||b.clicks!=2||closed!=1{
+  t.Fatalf("email-first flow did not progress: %+v clicks %d closed %d",result,b.clicks,closed)
+ }
+ if b.fills["#email"]!="owner@example.test"||b.fills["#pass"]!="long-example-password"{
+  t.Fatal("two-stage flow did not populate trusted fields")
+ }
+}
