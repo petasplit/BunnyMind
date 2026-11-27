@@ -13,7 +13,7 @@ func TestSafeAutonomousSignupOTPAndSessions(t *testing.T){
  r,err:=Run(ctx,false)
  if err!=nil{t.Fatal(err)}
  if r.Outcome!="cross_user_denied_in_synthetic_lab"||r.AccountsCreated!=2||
- r.MailMessagesRead!=3||r.OTPCodesSubmitted!=3||
+ r.MailMessagesRead!=3||r.OTPCodesSubmitted!=3||r.EmailChallengeTicketsCompleted!=2||
  !r.OTPReplayDenied||!r.DistinctSessions||!r.OwnerAccessObserved||
  !r.AnonymousDenied||r.ForeignAccessObserved||!r.RotationInvalidatedOld||
  !r.LogoutInvalidated||r.RequestCount>MaxCalls{t.Fatalf("unexpected workflow %+v",r)}
