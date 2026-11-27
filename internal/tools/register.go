@@ -26,6 +26,7 @@ func init() {
 		investigationBoardTool{},
 		inventoryGraphTool{},
 		engagementBlackboardTool{},
+		verifyLabReceiptsTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
