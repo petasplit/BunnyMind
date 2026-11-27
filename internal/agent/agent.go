@@ -441,7 +441,7 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 				}
 				return emit(e)
 			}
-			llmReq.ToolChoice = "required"
+			llmReq.ToolChoice = firstSecurityToolChoice(toolFirst)
 		}
 
 		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)

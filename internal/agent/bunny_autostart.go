@@ -88,6 +88,10 @@ For MFA, CAPTCHA, or anti-abuse challenges, request authorized human action.
 Report only observed results and genuine blockers. A model's claim is not
 evidence and intermediary blocks are not proof of application security.
 `
+func firstSecurityToolChoice(enabled bool)string{
+ if enabled{return "required"}
+ return ""
+}
 func securityActionStatus(name string)string{
  switch name{
  case "scoped_read":return "Inspecting in-scope URL"

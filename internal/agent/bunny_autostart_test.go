@@ -63,3 +63,19 @@ func TestOnlyRealToolNamesReceiveProgress(t *testing.T){
  if strings.Contains(strings.ToLower(securityActionStatus("auth_workflow_lab")),"target"){t.Fatal("misleading target sign-in label")}
  if securityActionStatus("http_request")!=""||securityActionStatus("terminal")!=""{t.Fatal("legacy network shortcut labelled as progress")}
 }
+
+func TestFirstSecurityProviderChoice(t *testing.T){
+ if got:=firstSecurityToolChoice(true);got!="required"{t.Fatalf("expected tool-first policy: %q",got)}
+ if got:=firstSecurityToolChoice(false);got!=""{t.Fatalf("ordinary chat should not force tool use: %q",got)}
+}
+func TestSpecialistNeverRunsUserAutoMission(t *testing.T){
+ readyPolicy(t)
+ req:=Request{Role:"security-recon",Depth:1,Quiet:true,Message:"Scope https://app.example.test"}
+ if readySecurityMission(req){t.Fatal("subagent silently reselected top-level mission")}
+}
+func TestSecurityScopeManifestInvalidFailsClosed(t *testing.T){
+ readyPolicy(t)
+ t.Setenv(bunnyguard.EnvPolicy,filepath.Join(t.TempDir(),"missing.json"))
+ req:=Request{Role:"security",Message:"Scope https://app.example.test"}
+ if readySecurityMission(req){t.Fatal("missing approved manifest activated")}
+}
