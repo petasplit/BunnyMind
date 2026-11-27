@@ -39,6 +39,7 @@ func init() {
 		approvedBrowserAuthTool{},
 		findingFocusTool{},
 		missionProfileTool{},
+		pythonProofRunTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
