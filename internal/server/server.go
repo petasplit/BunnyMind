@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/enowdev/antares/internal/agent"
+ "github.com/enowdev/antares/internal/bunnyfindingchat"
 	"github.com/enowdev/antares/internal/config"
 	"github.com/enowdev/antares/internal/cron"
 	"github.com/enowdev/antares/internal/gateway"
@@ -44,6 +45,7 @@ type Server struct {
 	hub        *liveHub
 	wake       *wakeQueue
 	started    time.Time
+ findingChats *bunnyfindingchat.Store
 
 	// distFS holds the embedded dashboard build, when present.
 	distFS fs.FS
@@ -111,6 +113,7 @@ func New(o Options) *Server {
 		hub:      newLiveHub(),
 		wake:     newWakeQueue(),
 		started:  time.Now(),
+  findingChats: bunnyfindingchat.New(config.Path("bunnymind","finding_chat")),
 		distFS:   o.Dist,
 		reloadFn: o.Reload,
 
