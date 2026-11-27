@@ -42,7 +42,7 @@ type InboxTransport interface {
 type IMAPTransport struct{}
 var mailHostname=regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]{1,251}[A-Za-z0-9])$`)
 var validMailboxAddress=regexp.MustCompile(`^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{3,190}$`)
-var verificationCodePattern=regexp.MustCompile(`[0-9]{4,8}`)
+var verificationCodePattern=regexp.MustCompile(`(^|[^0-9])([0-9]{4,8})([^0-9]|$)`)
 func validateMailboxConfig(c MailboxConfig)error{
  if c.Port!=993||!mailHostname.MatchString(c.Host)||net.ParseIP(c.Host)!=nil||
    strings.HasSuffix(c.Host,".")||strings.Contains(c.Host,"..")||
@@ -121,9 +121,9 @@ func verifiedCode(msg InboxMessage,box MailboxActor,since time.Time,usedUID uint
  contextText:=strings.ToLower(msg.Subject+" "+msg.Body)
  if !strings.Contains(contextText,"code")&&!strings.Contains(contextText,"verify")&&
   !strings.Contains(contextText,"verification"){return "",false}
- codes:=verificationCodePattern.FindAllString(msg.Body,-1)
- if len(codes)!=1{return "",false}
- return codes[0],true
+ codes:=verificationCodePattern.FindAllStringSubmatch(msg.Body,-1)
+ if len(codes)!=1||len(codes[0])!=4{return "",false}
+ return codes[0][2],true
 }
 // TrustedMailboxSecrets keeps OTP codes entirely within the privileged
 // browser integration. No mailbox body, sender or code reaches model tools.
