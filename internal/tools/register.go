@@ -28,6 +28,7 @@ func init() {
 		engagementBlackboardTool{},
 		verifyLabReceiptsTool{},
 		assessAuthzReceiptsTool{},
+		compareAuthzFixTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
