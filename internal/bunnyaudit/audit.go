@@ -83,7 +83,8 @@ func loadValidation(dir string) (validation, error) {
     if err != nil { return validation{}, err }
     var v validation
     decoder := json.NewDecoder(bytes.NewReader(raw))
-    decoder.DisallowUnknownFields()
+    // The runner's EvidenceSummary contains additional receipt and scoring
+    // fields. Read the provenance subset without rejecting that full schema.
     if err := decoder.Decode(&v); err != nil { return validation{}, err }
     var leftover any
     if decoder.Decode(&leftover) != io.EOF { return validation{}, errors.New("trailing validation data") }
