@@ -36,6 +36,7 @@ type adaptiveMockBrowser struct{
 func (b *adaptiveMockBrowser) Navigate(_ context.Context,u string)error{
  b.current=u
  if strings.HasSuffix(u,"/signup"){b.page=1}
+ if b.kind=="landing"&&strings.HasSuffix(u,"/login"){b.page=1}
  return nil
 }
 func (b *adaptiveMockBrowser) Fill(_ context.Context,selector,value string)error{
@@ -53,7 +54,7 @@ func (b *adaptiveMockBrowser) Contains(_ context.Context,text string)(bool,error
  return b.page>=b.successAt(),nil
 }
 func (b *adaptiveMockBrowser) successAt()int{
- if b.kind=="signup"{return 3}
+ if b.kind=="signup"||b.kind=="landing"{return 3}
  return 2
 }
 func (b *adaptiveMockBrowser) CurrentURL(_ context.Context)(string,error){return b.current,nil}
@@ -61,6 +62,13 @@ func (b *adaptiveMockBrowser) Close(){*b.closed++}
 func (b *adaptiveMockBrowser) DiscoverAuth(_ context.Context)(AuthPageState,error){
  f:=func(role string)DiscoveredField{return DiscoveredField{Selector:"#bm-auto-field-1",Role:role}}
  result:=AuthPageState{Kind:"login",Fields:[]DiscoveredField{f("email")},SubmitSelector:"#bm-auto-submit-1"}
+ if b.kind=="landing" {
+  switch b.page{
+  case 0:return AuthPageState{Kind:"unknown",LoginPath:"/login"},nil
+  case 1:return AuthPageState{Kind:"login",Fields:[]DiscoveredField{f("email")},SubmitSelector:"#bm-auto-submit-1"},nil
+  case 2:return AuthPageState{Kind:"login",Fields:[]DiscoveredField{f("password")},SubmitSelector:"#bm-auto-submit-1"},nil
+  }
+ }
  if b.kind=="signup" {
   switch b.page{
   case 0:return AuthPageState{Kind:"login",SignupPath:"/signup"},nil
@@ -157,3 +165,12 @@ func TestAdaptiveConfigurationRequiresExplicitBoundaries(t *testing.T){
  if ValidateAdaptive(cfg,scope,adaptiveManifest())==nil{t.Fatal("aggregate request quota ignored")}
 }
 var _=time.Second
+
+func TestAdaptiveFindsLoginFromUnfamiliarLandingPage(t *testing.T){
+ cfg:=AdaptiveConfig{Origin:"https://app.example",StartPath:"/",Mode:"login",
+  Actors:[]string{"owner"},SuccessText:"Signed in!"}
+ factory:=&adaptiveMockFactory{kind:"landing"}
+ result,err:=RunAdaptive(context.Background(),cfg,adaptiveScope(),adaptiveManifest(),factory,&adaptiveFakeSecrets{},nil,nil)
+ if err!=nil{t.Fatal(err)}
+ if result.StepsCompleted!=2||result.Actors!=1{t.Fatalf("landing sign-in discovery failed: %+v",result)}
+}
