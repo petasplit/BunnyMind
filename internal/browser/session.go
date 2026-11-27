@@ -32,6 +32,11 @@ type Session struct {
 	started   bool
 	userAgent string
 	tempDir   string // a profile dir we minted and must remove on Stop
+ popupMu sync.Mutex
+ popupSessions []popupSession
+ parentSession string
+ popupMax int
+
 }
 
 // New builds an unstarted session.
@@ -290,6 +295,7 @@ func (s *Session) Start(ctx context.Context) error {
 		"width": s.opts.Width, "height": s.opts.Height, "deviceScaleFactor": 1, "mobile": false,
 	})
 
+ s.parentSession=s.pageSess
 	s.started = true
 	s.lastUsed = time.Now()
 	return nil
@@ -314,6 +320,11 @@ func (s *Session) killLocked() {
 	}
 	s.started = false
 	s.pageSess = ""
+ s.popupMu.Lock()
+ s.popupSessions=nil
+ s.popupMax=0
+ s.popupMu.Unlock()
+ s.parentSession=""
 	s.targetID = ""
 	if s.tempDir != "" {
 		_ = os.RemoveAll(s.tempDir)
