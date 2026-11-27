@@ -145,6 +145,20 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   d=Decision{Allowed:true,Reason:"offline tool"}
  case "http_request","web_fetch":
   d=Decision{Reason:"legacy HTTP tool unavailable in guarded mode; use scoped_read"}
+ case "approved_browser_auth":
+  // This one model-facing operation runs only the plan and scope already
+  // installed by the operator. The tool independently validates them and
+  // restricts per-request destinations using the DNS-pinned proxy and CDP.
+  // A gate event counts the invocation, not every HTTP request inside it.
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="approved browser does not accept target or credential arguments"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_SCOPE"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_PLAN"))==""{
+   d.Reason="trusted browser scope and plan not configured"
+  }else{
+   d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
