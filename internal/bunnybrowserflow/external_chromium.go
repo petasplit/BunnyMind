@@ -64,5 +64,6 @@ func RunConfiguredApproved(ctx context.Context,scope ApprovedScope,plan Plan,
  }
  if !allowed[origin]{return Result{},errors.New("browser plan origin is not scope-approved")}
  if err:=validateSteps(plan);err!=nil{return Result{},err}
+ if err:=actorBudget(plan,scope,manifest);err!=nil{return Result{},err}
  return runTrusted(ctx,plan,factory,provider,operator,origin,allowed)
 }
