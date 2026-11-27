@@ -20,7 +20,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Guard unit tests
-        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/bunnylab ./internal/bunnyauthz ./internal/bunnyfix ./internal/bunnybuild ./cmd/bunnybuild-attest ./cmd/bunnyauthz-demo ./cmd/bunnyfix-demo ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools -count=1 ./internal/bunnyauthflow ./internal/bunnyidentity ./internal/bunnychallenge ./cmd/bunny-authflow-demo ./internal/bunnyresearch ./internal/bunnytimeline
+        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/bunnylab ./internal/bunnyauthz ./internal/bunnyfix ./internal/bunnybuild ./cmd/bunnybuild-attest ./cmd/bunnyauthz-demo ./cmd/bunnyfix-demo ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools -count=1 ./internal/bunnyauthflow ./internal/bunnyidentity ./internal/bunnychallenge ./cmd/bunny-authflow-demo ./internal/bunnyresearch ./internal/bunnytimeline ./internal/bunnyhar
       - name: Verify agent integration
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
