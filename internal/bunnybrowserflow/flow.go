@@ -33,17 +33,17 @@ var validPath=regexp.MustCompile(`^/[a-zA-Z0-9_./%-]{0,255}$`)
 // Plan is supplied by trusted local application configuration, not generated
 // dynamically by a model. It contains no credentials or OTP values.
 type Plan struct {
- Origin string
- Steps []Step
+ Origin string `json:"origin"`
+ Steps []Step `json:"steps"`
 }
 type Step struct {
- Actor string
- Op string
- Path string
- Selector string
- SecretKey string
- ExpectedText string
- ChallengeKind string
+ Actor string `json:"actor"`
+ Op string `json:"op"`
+ Path string `json:"path"`
+ Selector string `json:"selector"`
+ SecretKey string `json:"secret_key"`
+ ExpectedText string `json:"expected_text"`
+ ChallengeKind string `json:"challenge_kind"`
 }
 type Browser interface {
  Navigate(context.Context,string)error
@@ -100,6 +100,9 @@ func safePath(path string)bool{
 }
 func Validate(p Plan)error {
  if _,err:=Origin(p.Origin);err!=nil{return err}
+ return validateSteps(p)
+}
+func validateSteps(p Plan)error {
  if len(p.Steps)==0||len(p.Steps)>MaxSteps{return errors.New("plan needs 1..32 steps")}
  actors:=map[string]bool{}
  initialized:=map[string]bool{}
@@ -153,12 +156,19 @@ func proof(actor,action,state string,seq int)string{
 // post-action URL checks are a second layer, not a network sandbox.
 func Run(ctx context.Context,p Plan,factory Factory,secrets Secrets,operator Handoff)(Result,error){
  if err:=Validate(p);err!=nil{return Result{},err}
- if factory==nil{return Result{},errors.New("trusted browser factory missing")}
  origin,_:=Origin(p.Origin)
+ return runTrusted(ctx,p,factory,secrets,operator,origin,nil)
+}
+func runTrusted(ctx context.Context,p Plan,factory Factory,secrets Secrets,operator Handoff,origin string,approved map[string]bool)(Result,error){
+ if factory==nil{return Result{},errors.New("trusted browser factory missing")}
  sessions:=map[string]Browser{}
  defer func(){for _,b:=range sessions{b.Close()}}()
  result:=Result{Outcome:"completed_local_browser_fixture",Events:[]Event{},
   Disclaimer:"Completed actions occurred only in isolated numeric-loopback browser fixtures. A step hash is a local activity fingerprint, not independently signed security evidence."}
+ if approved!=nil{
+  result.Outcome="completed_approved_external_workflow"
+  result.Disclaimer="Operator-approved external browser steps were attempted under an HTTPS origin allowlist and local DNS-pinned proxy; these metadata records are not independent proof of a vulnerability."
+ }
  for i,s:=range p.Steps{
   if err:=ctx.Err();err!=nil{return Result{},err}
   b:=sessions[s.Actor]
@@ -193,7 +203,10 @@ func Run(ctx context.Context,p Plan,factory Factory,secrets Secrets,operator Han
    if err!=nil{return Result{},fmt.Errorf("step %d: operator handoff not completed",i+1)}
   }
   current,err:=b.CurrentURL(ctx)
-  if err!=nil||!allowedURL(current,origin){return Result{},fmt.Errorf("step %d: browser left approved local origin",i+1)}
+  allowed:=false
+  if approved==nil{allowed=allowedURL(current,origin)
+  }else{allowed=approvedBrowserURL(current,approved)}
+  if err!=nil||!allowed{return Result{},fmt.Errorf("step %d: browser left approved origin",i+1)}
   result.Events=append(result.Events,Event{
    Seq:i+1,Actor:s.Actor,Action:s.Op,Outcome:"succeeded",
    EvidenceSHA256:proof(s.Actor,s.Op,"succeeded",i+1),
