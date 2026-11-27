@@ -132,7 +132,7 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
  network:=false;origin:=""
  switch tool{
  case "read_file","read_document","list_files","glob","grep","todo","skill",
- "session_search","rag_search","review_evidence","report_finding","triage_finding","add_intel",
+ "session_search","rag_search","review_evidence","investigation_board","report_finding","triage_finding","add_intel",
  "methodology_status","list_roles","view_image":
   d=Decision{Allowed:true,Reason:"offline tool"}
  case "http_request","web_fetch":
