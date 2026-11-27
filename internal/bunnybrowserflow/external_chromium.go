@@ -7,6 +7,7 @@ import (
 
  "github.com/enowdev/antares/internal/browser"
  "github.com/enowdev/antares/internal/bunnyegress"
+ "github.com/enowdev/antares/internal/bunnyguard"
 )
 
 // ApprovedChromiumFactory is constructed by trusted command/controller code,
@@ -38,9 +39,8 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
 // trusted, prevalidated plan. The credentials remain in a trusted provider;
 // no challenge completion is synthesized or bypassed.
 func RunConfiguredApproved(ctx context.Context,scope ApprovedScope,plan Plan,
- provider Secrets,operator Handoff,manifestOriginCheck func(ApprovedScope,Plan)error)(Result,error){
- if manifestOriginCheck==nil{return Result{},errors.New("scope verification callback required")}
- if err:=manifestOriginCheck(scope,plan);err!=nil{return Result{},err}
+ provider Secrets,operator Handoff,manifest bunnyguard.Policy)(Result,error){
+ if _,err:=ValidateApprovedScope(scope,manifest);err!=nil{return Result{},err}
  proxy,err:=bunnyegress.New(bunnyegress.Config{
   Origins:scope.AllowedOrigins,MaxTunnels:scope.MaxTunnels,
  })
