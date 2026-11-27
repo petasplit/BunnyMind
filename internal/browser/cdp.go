@@ -200,6 +200,13 @@ func (c *conn) takeEvents(method string) []json.RawMessage {
 
 // Options configure how a browser is started.
 type Options struct {
+ // ExternalOrigins and ExternalProxyURL allow a constrained HTTPS
+ // browser backed by an approved, public-IP-pinning localhost proxy.
+ ExternalOrigins []string
+ ExternalPostPaths []string
+ ExternalProxyURL string
+ ExternalMaxRequests int
+ ExternalMinIntervalMS int
  // LoopbackOrigin, when set, isolates the new browser session to this exact
  // numeric-loopback HTTP origin with request-stage CDP interception. Intended
  // exclusively for disposable local fixtures, never for public-host testing.
