@@ -34,6 +34,7 @@ type Observation struct {
  RequestSHA256 string `json:"request_sha256"`
  ResponseSHA256 string `json:"response_sha256"`
  MarkerSHA256 string `json:"marker_sha256"`
+ BuildSHA256 string `json:"build_sha256,omitempty"`
  ResponseStatus int `json:"response_status"`
  MarkerPresent bool `json:"marker_present"`
  MarkerInRequest bool `json:"marker_in_request"`
@@ -72,6 +73,7 @@ func ValidObservation(o Observation)error{
   u.User!=nil||u.Hostname()==""||(u.Path!=""&&u.Path!="/")||u.RawQuery!=""||u.Fragment!=""{
   return errors.New("origin must be an absolute HTTP(S) origin without credentials")
  }
+ if o.BuildSHA256!=""&&!sha.MatchString(o.BuildSHA256){return errors.New("optional build_sha256 must be a lowercase SHA256 digest")}
  for _,v:=range []string{o.RequestSHA256,o.ResponseSHA256,o.MarkerSHA256}{
   if !sha.MatchString(v){return errors.New("request, response and marker require SHA-256 digests")}
  }
@@ -107,6 +109,8 @@ func Verify(pub ed25519.PublicKey,b Bundle)(Summary,error){
  if len(b.Receipts)==0||len(b.Receipts)>MaxReceipts{return Summary{},fmt.Errorf("bundle needs 1..%d signed receipts",MaxReceipts)}
  seen:=map[string]bool{}
  var marker,origin string
+ var build string
+ seenBuild:=false
  var badPositive,controlPresent,reflected bool
  for _,r:=range b.Receipts{
   if err:=verifyOne(pub,r);err!=nil{return Summary{},fmt.Errorf("untrusted receipt: %w",err)}
@@ -116,6 +120,7 @@ func Verify(pub ed25519.PublicKey,b Bundle)(Summary,error){
   seen[o.SampleID]=true
   if marker==""{marker=o.MarkerSHA256}else if marker!=o.MarkerSHA256{return Summary{},errors.New("different proof indicator hashes")}
   if origin==""{origin=o.Origin}else if origin!=o.Origin{return Summary{},errors.New("mixed origins")}
+  if !seenBuild{build=o.BuildSHA256;seenBuild=true}else if build!=o.BuildSHA256{return Summary{},errors.New("mixed artifact build fingerprints")}
   out.AuthenticatedReceipts++
   signedBytes,_:=json.Marshal(r)
   out.ReceiptsSHA256=append(out.ReceiptsSHA256,Dig(string(signedBytes)))

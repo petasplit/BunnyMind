@@ -34,6 +34,7 @@ type Plan struct {
  CaseID string `json:"case_id"`
  Origin string `json:"origin"`
  Marker string `json:"marker"`
+ BuildSHA256 string `json:"build_sha256,omitempty"`
  Probes []Probe `json:"probes"`
 }
 func loopbackOrigin(raw string)(*url.URL,error){
@@ -73,7 +74,7 @@ func Validate(plan Plan)error{
   Version:1,EngagementID:plan.EngagementID,RunID:plan.RunID,CaseID:plan.CaseID,
   SampleID:"validation",Kind:"positive",Method:"GET",Origin:plan.Origin,
   RequestSHA256:bunnyreceipt.Dig("sample"),ResponseSHA256:bunnyreceipt.Dig("sample"),
-  MarkerSHA256:bunnyreceipt.Dig(plan.Marker),ResponseStatus:200,RecordedAt:time.Now().UTC().Format(time.RFC3339Nano),
+  MarkerSHA256:bunnyreceipt.Dig(plan.Marker),BuildSHA256:plan.BuildSHA256,ResponseStatus:200,RecordedAt:time.Now().UTC().Format(time.RFC3339Nano),
  }
  if err:=bunnyreceipt.ValidObservation(first);err!=nil{return fmt.Errorf("invalid lab run metadata: %w",err)}
  seen:=map[string]bool{}
@@ -157,7 +158,7 @@ func CaptureWithPersonas(ctx context.Context,plan Plan,private ed25519.PrivateKe
    // hash weak test bearer tokens: an offline digest could expose them.
    RequestSHA256:bunnyreceipt.Dig("GET\n"+full+"\nactor:"+probe.Persona),
    ResponseSHA256:bunnyreceipt.Dig(string(payload)),
-   MarkerSHA256:bunnyreceipt.Dig(plan.Marker),
+   MarkerSHA256:bunnyreceipt.Dig(plan.Marker),BuildSHA256:plan.BuildSHA256,
    ResponseStatus:response.StatusCode,MarkerPresent:strings.Contains(string(payload),plan.Marker),
    MarkerInRequest:reflected,RecordedAt:time.Now().UTC().Format(time.RFC3339Nano),
   }
