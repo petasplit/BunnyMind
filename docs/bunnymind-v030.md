@@ -99,7 +99,8 @@ To export a complete private HTTP transcript, use the existing local `bunny-pyth
 - The AI can now **synthesize and preserve bounded Python scenarios and custom offline oracle code**, but it cannot execute arbitrary unreviewed Python from an LLM. That distinction protects external services and keeps test cases reproducible.
 - The engine has not been validated against live bug-bounty assets in this milestone. A real target needs explicitly current authorization, a bounded manifest, test personas and permission for the intended methods.
 - Production Cloudflare Turnstile and other CAPTCHA controls are not bypassed. Official provider test keys, site-owner-approved exceptions, naturally completed challenges, and legitimate user verification remain the supported routes.
-- A campaign's request cap is enforced locally; **cross-process global request reservation** remains a future hardening task when multiple independent BunnyMind processes share one engagement.
+- Python evidence runners sharing the same `BUNNY_PROOF_OUTPUT` root now reserve their *maximum planned requests* in a persistent engagement quota ledger **before executing**. A separate execution lease prevents two proof processes from interleaving requests and defeating the intended pacing. Both mechanisms use atomic exclusive file creation. Unused reservations are not automatically refunded after failures or crashes.
+- These ledgers cover the Python proof runners sharing **one output directory**. Other BunnyMind network tools and separately configured output directories are not yet unified under a single operating-system-level global quota. The Python execution lease and quota lock fail closed; an interrupted process may leave a stale `.lock` file that the operator must investigate and clear manually after confirming no worker remains.
 
 ## Related work
 
