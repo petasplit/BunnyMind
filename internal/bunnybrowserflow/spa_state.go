@@ -4,6 +4,7 @@ import (
  "context"
  "errors"
  "net/url"
+ "strings"
  "time"
 )
 
@@ -16,7 +17,7 @@ func approvedOriginOf(raw string,approved map[string]bool)(string,error){
  u.Hostname()==""||(u.Port()!=""&&u.Port()!="443"){
   return "",errors.New("browser navigation outside approved HTTPS origins")
  }
- origin:="https://"+u.Hostname()
+ origin:="https://"+strings.ToLower(u.Hostname())
  if !approved[origin]{return "",errors.New("browser left approved authentication scope")}
  return origin,nil
 }
