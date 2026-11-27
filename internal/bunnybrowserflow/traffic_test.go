@@ -1,6 +1,7 @@
 package bunnybrowserflow
 
 import (
+ "context"
  "encoding/json"
  "strings"
  "testing"
@@ -57,4 +58,34 @@ func TestTrafficBoundedToMaxReceipts(t *testing.T){
  if len(redactTraffic("bad/name",1,requests,map[string]bool{"https://staging.example":true}))!=0{
   t.Fatal("unsafe actor accepted")
  }
+}
+
+type observingBrowser struct{fake}
+func (b *observingBrowser) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)[]TrafficReceipt{
+ req:=[]browser.NetworkRequest{{URL:"https://staging.example/protected?private=never-echo",Method:"GET",Response:&browser.NetworkResponse{Status:200}}}
+ return redactTraffic(actor,step,req,allowed)
+}
+type observingFactory struct{closed *int}
+func (f observingFactory) New(_ context.Context,actor,origin string)(Browser,error){
+ return &observingBrowser{fake{closeCount:f.closed}},nil
+}
+func TestWorkflowIncludesOnlyRedactedObservedTraffic(t *testing.T){
+ closed:=0
+ scope:=sampleScope()
+ plan:=Plan{Origin:"https://staging.example",Steps:[]Step{{Actor:"owner",Op:OpNavigate,Path:"/"}}}
+ manifest:=approvedManifest()
+ manifest.AllowedOrigins=[]string{"https://staging.example"}
+ out,err:=RunApproved(context.Background(),plan,scopeWithStaging(scope),observingFactory{closed:&closed},fakeSecrets{},nil,manifest)
+ if err!=nil{t.Fatal(err)}
+ if len(out.Traffic)!=1||out.Traffic[0].Actor!="owner"||out.Traffic[0].Status!=200{
+  t.Fatalf("recorder did not attach: %+v",out)
+ }
+ b,_:=json.Marshal(out)
+ if strings.Contains(string(b),"private=never-echo")||strings.Contains(string(b),"/protected"){
+  t.Fatal("raw browser traffic appeared in workflow result")
+ }
+}
+func scopeWithStaging(s ApprovedScope) ApprovedScope{
+ s.AllowedOrigins=[]string{"https://staging.example"}
+ return s
 }
