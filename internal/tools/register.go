@@ -38,6 +38,7 @@ func init() {
 		authBrowserLabTool{},
 		approvedBrowserAuthTool{},
 		findingFocusTool{},
+		missionProfileTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
