@@ -24,6 +24,7 @@ type AuthPageState struct {
  Challenge string `json:"challenge,omitempty"`
  ProviderSelector string `json:"provider_selector,omitempty"`
  CaptchaTestKey bool `json:"captcha_test_key,omitempty"`
+ CaptchaReady bool `json:"captcha_ready,omitempty"`
 }
 type DiscoveryBrowser interface {
  Browser
@@ -80,7 +81,7 @@ func validateDiscovery(d AuthPageState)error {
  if d.LoginPath!=""&&!safePath(d.LoginPath){return errors.New("invalid login link path")}
  if d.SubmitSelector!=""&&!safeDiscoverySelector.MatchString(d.SubmitSelector){return errors.New("invalid discovered submit ref")}
  if d.ProviderSelector!=""&&!safeDiscoverySelector.MatchString(d.ProviderSelector){return errors.New("invalid IDP selector")}
- if d.CaptchaTestKey&&d.Challenge!="anti_bot"{return errors.New("test key indicator requires CAPTCHA challenge")}
+ if (d.CaptchaTestKey||d.CaptchaReady)&&d.Challenge!="anti_bot"{return errors.New("CAPTCHA metadata requires anti-bot challenge")}
  if strings.HasPrefix(d.ProviderSelector,"#")&&strings.Contains(d.ProviderSelector,"field"){return errors.New("invalid provider selector")}
  seen:=map[string]bool{}
  roles:=map[string]bool{"email":true,"username":true,"password":true,"password_confirm":true,"otp":true}
