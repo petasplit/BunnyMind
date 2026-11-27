@@ -161,9 +161,14 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    if state.ProviderSelector!=""&&len(state.Fields)==0{
     before,_:=b.CurrentURL(ctx)
     if err:=b.Click(ctx,state.ProviderSelector);err!=nil{return Result{},errors.New("approved SSO control could not be opened")}
-    if _,err:=awaitAuthProgress(ctx,b,discovered,uniqueState(state),before,cfg.SuccessText,allow,idpOrigins);err!=nil{return Result{},err}
+    signed,e:=awaitAuthProgress(ctx,b,discovered,uniqueState(state),before,cfg.SuccessText,allow,idpOrigins)
+    if e!=nil{return Result{},e}
     current,e:=b.CurrentURL(ctx)
     if e!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("SSO redirect left approved origins")}
+    seq:=len(result.Events)+1
+    result.Events=append(result.Events,Event{Seq:seq,Actor:actor,Action:"approved_sso_redirect",
+     Outcome:"observed",EvidenceSHA256:adaptiveDigest(actor,"idp_redirect",seq)})
+    if signed{complete=true;break}
     previous=""
     continue
    }
