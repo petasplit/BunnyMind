@@ -16,11 +16,11 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Guard unit tests
-        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./cmd/bunnybench ./internal/tools -count=1
+        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./cmd/bunnybench ./internal/tools -count=1
       - name: Verify agent integration
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
-        run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/tools ./internal/agent ./internal/config
+        run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/tools ./internal/agent ./internal/config
 
   harness-microbench:
     runs-on: ubuntu-latest
