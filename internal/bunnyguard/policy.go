@@ -159,6 +159,18 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
   }
+ case "approved_adaptive_auth":
+  // The model cannot supply targets, account identities, plans or mailbox
+  // settings. All such inputs must exist as operator-installed trusted files.
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="adaptive authentication accepts no model-supplied arguments"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_APPROVED_BROWSER_SCOPE"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_APPROVED_ADAPTIVE_CONFIG"))==""{
+   d.Reason="trusted adaptive browser scope and configuration missing"
+  }else{
+   d=Decision{Allowed:true,Reason:"preauthorized adaptive browser workflow"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
