@@ -8,16 +8,18 @@ import (
  "testing"
 
  "github.com/enowdev/antares/internal/bunnyidentity"
+ "github.com/enowdev/antares/internal/bunnychallenge"
 )
 func TestTrustedPortsRegisterOTPAndVault(t *testing.T){
  box:=NewMailbox();svc:=NewService(box,false)
  server:=httptest.NewServer(svc.Handler());defer server.Close()
  client,err:=newLocalClient(server.URL);if err!=nil{t.Fatal(err)}
  vault:=bunnyidentity.New();defer vault.Close()
- flow:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault}
+ broker,err:=bunnychallenge.New(nil);if err!=nil{t.Fatal(err)}
+ flow:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault,Challenges:broker}
  created,err:=flow.Provision(context.Background(),"owner","user_123@example.test")
  if err!=nil{t.Fatal(err)}
- if created.Actor!="owner"||len(created.ResourceID)<12||!created.CodeConsumed||!created.SessionVaulted{t.Fatalf("%+v",created)}
+ if created.Actor!="owner"||len(created.ResourceID)<12||!created.CodeConsumed||!created.SessionVaulted||!created.ChallengeCompleted{t.Fatalf("%+v",created)}
  if err:=vault.Use("owner",func(token,resource string)error{
   if resource!=created.ResourceID||len(token)<32{t.Fatal("missing synthetic session credentials")}
   return nil

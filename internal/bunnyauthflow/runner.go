@@ -14,12 +14,14 @@ import (
  "time"
 
  "github.com/enowdev/antares/internal/bunnyidentity"
+ "github.com/enowdev/antares/internal/bunnychallenge"
 )
 
 const MaxCalls=28
 type Outcome struct{
  Outcome string `json:"outcome"`
  AccountsCreated int `json:"accounts_created"`
+ EmailChallengeTicketsCompleted int `json:"email_challenge_tickets_completed"`
  MailMessagesRead int `json:"mail_messages_read"`
  OTPCodesSubmitted int `json:"otp_codes_submitted"`
  OTPReplayDenied bool `json:"otp_replay_denied"`
@@ -121,10 +123,15 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  // enrollment and no test-account data is exposed to the agent tool.
  vault:=bunnyidentity.New()
  defer vault.Close()
- coordinator:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault}
+ broker,err:=bunnychallenge.New(nil)
+ if err!=nil{return Outcome{},err}
+ coordinator:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault,Challenges:broker}
  a,err:=coordinator.Provision(ctx,"owner",alice);if err!=nil{return Outcome{},err}
  b,err:=coordinator.Provision(ctx,"foreign",bob);if err!=nil{return Outcome{},err}
  aliceResource,bobResource:=a.ResourceID,b.ResourceID
+ if !a.ChallengeCompleted||!b.ChallengeCompleted||broker.Count()!=2{
+  return Outcome{},errors.New("synthetic email verification tickets did not complete")
+ }
  if aliceResource==bobResource{return Outcome{},errors.New("synthetic resources not isolated")}
  distinct:=false
  err=vault.Use("owner",func(ownerToken,_ string)error{
@@ -147,7 +154,7 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
   return status,body,err
  }
  out:=Outcome{
-  AccountsCreated:2,MailMessagesRead:2,OTPCodesSubmitted:2,
+  AccountsCreated:2,EmailChallengeTicketsCompleted:2,MailMessagesRead:2,OTPCodesSubmitted:2,
   DistinctSessions:true,Outcome:"inconclusive",
   Notes:"Synthetic localhost-only signup, trusted mailbox OTP extraction, bearer sessions, login, rotation and logout. No actual third-party account was created or accessed.",
  }

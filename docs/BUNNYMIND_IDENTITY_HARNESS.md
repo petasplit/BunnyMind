@@ -62,3 +62,18 @@ Add a stateful challenge handoff for human-controlled MFA or anti-abuse
 checks, a persistent operator-approved scope policy for testing accounts,
 and trusted staging adapters that never expose cookies/tokens to the LLM.
 Then run controlled multi-agent comparisons with signed recorder evidence.
+
+## v0.19 challenge lifecycle integration
+
+The authentication coordinator now issues short-lived `email_otp`
+challenge tickets through BunnyChallenge before registering a synthetic
+account. After the private in-memory mailbox code is successfully exchanged
+for a high-entropy bearer session, the ticket is settled using a digest of
+the issued session token—not the six-digit OTP. Account enrollment fails
+closed if the challenge could not be completed.
+
+Both synthetic account tickets must complete for the end-to-end workflow
+to succeed. The result reports `email_challenge_tickets_completed: 2`
+without including OTP values or challenge secrets. Other challenge types
+are deliberately handed to the human-approval path, not automatically
+bypassed.
