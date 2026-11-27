@@ -19,6 +19,11 @@ type AdaptiveConfig struct {
  Actors []string `json:"actors"`
  SuccessText string `json:"success_text"`
  UseEmailOTP bool `json:"use_email_otp"`
+ UseTOTP bool `json:"use_totp,omitempty"`
+ UseMagicLink bool `json:"use_magic_link,omitempty"`
+ MagicLinkPrefixes []string `json:"magic_link_prefixes,omitempty"`
+ IdPOrigins []string `json:"idp_origins,omitempty"`
+ CaptchaTestMode bool `json:"captcha_test_mode,omitempty"`
  Mailboxes map[string]MailboxSettings `json:"mailboxes,omitempty"`
 }
 type OTPProvider interface {
@@ -44,11 +49,31 @@ func ValidateAdaptive(cfg AdaptiveConfig,scope ApprovedScope,manifest bunnyguard
   return errors.New("aggregate adaptive browser request budget exceeds permission")
  }
  if len(scope.ApprovedPostPaths)==0{return errors.New("adaptive auth requires explicitly approved POST paths")}
- if cfg.UseEmailOTP {
-  if len(cfg.Mailboxes)!=len(cfg.Actors){return errors.New("each OTP persona requires its own configured mailbox")}
+ factors:=0
+ if cfg.UseEmailOTP{factors++}
+ if cfg.UseTOTP{factors++}
+ if cfg.UseMagicLink{factors++}
+ if factors>1{return errors.New("select one trusted factor type per adaptive workflow")}
+ if cfg.UseEmailOTP||cfg.UseMagicLink{
+  if len(cfg.Mailboxes)!=len(cfg.Actors){return errors.New("each verification persona requires its own configured mailbox")}
   for _,actor:=range cfg.Actors{if _,ok:=cfg.Mailboxes[actor];!ok{return errors.New("missing approved actor mailbox")}}
   if _,err:=NewIMAPOTP(cfg.Mailboxes,KeyringSecrets{});err!=nil{return err}
- }else if len(cfg.Mailboxes)!=0{return errors.New("mailboxes supplied while email OTP mode is disabled")}
+ }else if len(cfg.Mailboxes)!=0{return errors.New("mailboxes supplied without email verification")}
+ if cfg.UseMagicLink{
+  if len(cfg.MagicLinkPrefixes)==0||len(cfg.MagicLinkPrefixes)>12{return errors.New("magic link endpoint allowlist is required")}
+  for _,prefix:=range cfg.MagicLinkPrefixes{
+   if !safePath(prefix){return errors.New("invalid operator-approved magic link path prefix")}
+  }
+ }else if len(cfg.MagicLinkPrefixes)!=0{return errors.New("unexpected magic link path allowlist")}
+ if len(cfg.IdPOrigins)>8{return errors.New("too many approved identity-provider origins")}
+ seenIDP:=map[string]bool{}
+ for _,raw:=range cfg.IdPOrigins{
+  idp,err:=strictOrigin(raw)
+  if err!=nil||!allowed[idp]||idp==origin||seenIDP[idp]{
+   return errors.New("identity provider must be a distinct explicitly approved HTTPS origin")
+  }
+  seenIDP[idp]=true
+ }
  return nil
 }
 func fieldForRole(fields []DiscoveredField,role string)string{
@@ -58,7 +83,7 @@ func fieldForRole(fields []DiscoveredField,role string)string{
 func uniqueState(s AuthPageState)string {
  var parts []string
  for _,f:=range s.Fields{parts=append(parts,f.Role)}
- return s.Kind+"|"+strings.Join(parts,",")+"|"+s.SignupPath+"|"+s.LoginPath
+ return s.Kind+"|"+strings.Join(parts,",")+"|"+s.SignupPath+"|"+s.LoginPath+"|"+s.ProviderSelector
 }
 func adaptiveDigest(actor,action string,step int)string{
  h:=sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%d",actor,action,step)))
@@ -71,10 +96,12 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
  factory Factory,secrets Secrets,otp OTPProvider,operator Handoff)(Result,error){
  if err:=ValidateAdaptive(cfg,scope,manifest);err!=nil{return Result{},err}
  if factory==nil||secrets==nil{return Result{},errors.New("trusted browser and credential providers required")}
- if cfg.UseEmailOTP&&otp==nil{return Result{},errors.New("email OTP requires a trusted mailbox adapter")}
+ if (cfg.UseEmailOTP||cfg.UseTOTP||cfg.UseMagicLink)&&otp==nil{return Result{},errors.New("trusted verification provider required")}
  origin,_:=strictOrigin(cfg.Origin)
  allow:=map[string]bool{}
  for _,v:=range scope.AllowedOrigins{o,_:=strictOrigin(v);allow[o]=true}
+ idpOrigins:=make([]string,0,len(cfg.IdPOrigins))
+ for _,v:=range cfg.IdPOrigins{o,_:=strictOrigin(v);idpOrigins=append(idpOrigins,o)}
  result:=Result{Outcome:"completed_adaptive_auth",Events:[]Event{},
   Disclaimer:"Operator-scoped browser observations and login indicators are not proof of a vulnerability. Raw credentials and mailbox content are never returned."}
  sessions:=map[string]Browser{}
@@ -90,25 +117,58 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
   if wasLoggedIn,e:=b.Contains(ctx,cfg.SuccessText);e==nil&&wasLoggedIn{
    return Result{},errors.New("expected success text is present before authentication")
   }
-  if cfg.UseEmailOTP{
-   if err:=otp.Arm(ctx,actor);err!=nil{return Result{},errors.New("trusted mailbox baseline unavailable")}
+  if cfg.UseEmailOTP||cfg.UseTOTP||cfg.UseMagicLink{
+   if err:=otp.Arm(ctx,actor);err!=nil{return Result{},errors.New("trusted verification factor unavailable")}
   }
   discovered,ok:=b.(DiscoveryBrowser)
   if !ok{return Result{},errors.New("browser does not support form discovery")}
   previous:=""
   complete:=false
+  magicConsumed:=false
+  captchaWaits:=0
   for round:=1;round<=maxAdaptiveRounds;round++{
    if err:=ctx.Err();err!=nil{return Result{},err}
-   state,err:=discovered.DiscoverAuth(ctx)
+   var state AuthPageState
+   if scoped,yes:=discovered.(ScopedDiscoveryBrowser);yes{
+    state,err=scoped.DiscoverAuthScoped(ctx,idpOrigins)
+   }else{state,err=discovered.DiscoverAuth(ctx)}
    if err!=nil{return Result{},errors.New("auth form discovery failed")}
    if err:=validateDiscovery(state);err!=nil{return Result{},err}
    if state.Ambiguous{return Result{},fmt.Errorf("ambiguous authentication actions for %s; operator review required",actor)}
    if state.Challenge!=""{
-    if operator==nil{return Result{},fmt.Errorf("%s requires operator %s handoff",actor,state.Challenge)}
-    handoffCtx,cancel:=context.WithTimeout(ctx,2*time.Minute)
-    e:=operator.Authorize(handoffCtx,actor,state.Challenge)
-    cancel()
-    if e!=nil{return Result{},errors.New("operator verification was not completed")}
+    if state.Challenge=="anti_bot"&&cfg.CaptchaTestMode&&state.CaptchaTestKey{
+     if !state.CaptchaReady{
+      captchaWaits++
+      if captchaWaits>3{return Result{},errors.New("official CAPTCHA test widget did not complete normally")}
+      select{
+      case <-ctx.Done():return Result{},ctx.Err()
+      case <-time.After(500*time.Millisecond):
+      }
+      continue
+     }
+     // A real site-generated test token is present. Never fabricate a
+     // CAPTCHA response, force a checkbox or alter production protection.
+    }else{
+     if operator==nil{return Result{},fmt.Errorf("%s requires operator %s handoff",actor,state.Challenge)}
+     handoffCtx,cancel:=context.WithTimeout(ctx,2*time.Minute)
+     e:=operator.Authorize(handoffCtx,actor,state.Challenge)
+     cancel()
+     if e!=nil{return Result{},errors.New("operator verification was not completed")}
+     previous=""
+     continue
+    }
+   }
+   if state.ProviderSelector!=""&&len(state.Fields)==0{
+    before,_:=b.CurrentURL(ctx)
+    if err:=b.Click(ctx,state.ProviderSelector);err!=nil{return Result{},errors.New("approved SSO control could not be opened")}
+    signed,e:=awaitAuthProgress(ctx,b,discovered,uniqueState(state),before,cfg.SuccessText,allow,idpOrigins)
+    if e!=nil{return Result{},e}
+    current,e:=b.CurrentURL(ctx)
+    if e!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("SSO redirect left approved origins")}
+    seq:=len(result.Events)+1
+    result.Events=append(result.Events,Event{Seq:seq,Actor:actor,Action:"approved_sso_redirect",
+     Outcome:"observed",EvidenceSHA256:adaptiveDigest(actor,"idp_redirect",seq)})
+    if signed{complete=true;break}
     previous=""
     continue
    }
@@ -142,10 +202,10 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
     case "username":key="username"
     case "password","password_confirm":key="password"
     case "otp":
-     if !cfg.UseEmailOTP{return Result{},errors.New("OTP requested but trusted mailbox integration is disabled")}
+     if !(cfg.UseEmailOTP||cfg.UseTOTP){return Result{},errors.New("OTP requested without an approved owned second factor")}
      if otpValue==""{
       code,e:=otp.Wait(ctx,actor)
-      if e!=nil{return Result{},errors.New("verification email unavailable or untrusted")}
+      if e!=nil{return Result{},errors.New("trusted second-factor verification unavailable")}
       if len(code)<6||len(code)>8{return Result{},errors.New("invalid verification code length")}
       otpValue=code
      }
@@ -165,6 +225,7 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    if fieldsFilled==0||state.SubmitSelector==""{
     return Result{},fmt.Errorf("no unambiguous fillable auth form for %s; operator review required",actor)
    }
+   beforeURL,_:=b.CurrentURL(ctx)
    if err:=b.Click(ctx,state.SubmitSelector);err!=nil{return Result{},errors.New("approved form submission failed")}
    current,err:=b.CurrentURL(ctx)
    if err!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("form navigation left approved scope")}
@@ -179,6 +240,28 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    }
    result.StepsCompleted++
    if yes,e:=b.Contains(ctx,cfg.SuccessText);e==nil&&yes{complete=true;break}
+   if cfg.UseMagicLink&&!magicConsumed{
+    provider,ok:=otp.(MagicLinkProvider)
+    if !ok{return Result{},errors.New("trusted magic-link provider is not configured")}
+    link,e:=provider.WaitLink(ctx,actor,allow,cfg.MagicLinkPrefixes)
+    if e!=nil{return Result{},errors.New("approved mailbox magic link unavailable")}
+    if !magicLinkAllowed(link,allow,cfg.MagicLinkPrefixes){
+     return Result{},errors.New("mail link destination outside approved sign-in callbacks")
+    }
+    if e=b.Navigate(ctx,link);e!=nil{return Result{},errors.New("approved magic link browser navigation failed")}
+    if after,e:=b.CurrentURL(ctx);e!=nil||!approvedBrowserURL(after,allow){
+     return Result{},errors.New("magic link redirected outside approved scope")
+    }
+    magicConsumed=true
+    linkSeq:=len(result.Events)+1
+    result.Events=append(result.Events,Event{Seq:linkSeq,Actor:actor,
+     Action:"trusted_magic_link_open",Outcome:"observed",
+     EvidenceSHA256:adaptiveDigest(actor,"magic_link",linkSeq)})
+    if yes,e:=b.Contains(ctx,cfg.SuccessText);e==nil&&yes{complete=true;break}
+   }
+   succeeded,e:=awaitAuthProgress(ctx,b,discovered,signature,beforeURL,cfg.SuccessText,allow,idpOrigins)
+   if e!=nil{return Result{},e}
+   if succeeded{complete=true;break}
   }
   if !complete{return Result{},fmt.Errorf("authentication for %s remained unverified within experiment budget",actor)}
  }

@@ -43,9 +43,11 @@ func RunConfiguredAdaptive(ctx context.Context,scope ApprovedScope,cfg AdaptiveC
   Headless:headless,Scope:scope,
  }
  var otp OTPProvider
- if cfg.UseEmailOTP{
+ if cfg.UseEmailOTP||cfg.UseMagicLink{
   otp,err=NewIMAPOTP(cfg.Mailboxes,secrets)
   if err!=nil{return Result{},err}
+ }else if cfg.UseTOTP{
+  otp=OwnedTOTP{Secrets:secrets}
  }
  return RunAdaptive(ctx,cfg,scope,manifest,factory,secrets,otp,operator)
 }

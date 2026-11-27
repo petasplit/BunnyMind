@@ -118,7 +118,8 @@ func extractVerifiedCode(body,sender,recipient string,message *imap.Message,sinc
  if len(found)!=1{return "",false}
  return found[0],true
 }
-func (m *IMAPOTP) check(ctx context.Context,actor string,checkpoint mailboxCheckpoint)(string,error){
+func (m *IMAPOTP) lookup(ctx context.Context,actor string,checkpoint mailboxCheckpoint,
+ mode string,allowed map[string]bool,prefixes []string)(string,error){
  cli,err:=m.login(ctx,actor)
  if err!=nil{return "",err}
  defer cli.Logout()
@@ -144,13 +145,45 @@ func (m *IMAPOTP) check(ctx context.Context,actor string,checkpoint mailboxCheck
   if len(b)>maxMailBytes{continue}
   text,err:=readMailText(b)
   if err!=nil{continue}
-  code,ok:=extractVerifiedCode(text,m.Settings[actor].Sender,checkpoint.recipient,msg,checkpoint.armedAt)
-  if ok{candidates=append(candidates,code)}
+  var candidate string
+  ok:=false
+  if mode=="code"{
+   candidate,ok=extractVerifiedCode(text,m.Settings[actor].Sender,checkpoint.recipient,msg,checkpoint.armedAt)
+  }else if mode=="magic_link"{
+   var e error
+   candidate,e=extractVerifiedMagicLink(text,m.Settings[actor].Sender,
+    checkpoint.recipient,msg,checkpoint.armedAt,allowed,prefixes)
+   ok=e==nil
+  }
+  if ok{candidates=append(candidates,candidate)}
  }
  if err:=<-done;err!=nil{return "",errors.New("IMAP message fetch failed")}
  if len(candidates)>1{return "",errors.New("multiple matching codes require operator review")}
  if len(candidates)==1{return candidates[0],nil}
  return "",nil
+}
+func (m *IMAPOTP) check(ctx context.Context,actor string,checkpoint mailboxCheckpoint)(string,error){
+ return m.lookup(ctx,actor,checkpoint,"code",nil,nil)
+}
+func (m *IMAPOTP) WaitLink(ctx context.Context,actor string,allowed map[string]bool,prefixes []string)(string,error){
+ if len(allowed)==0||len(prefixes)==0{return "",errors.New("approved magic link destinations required")}
+ m.mu.Lock();checkpoint,armed:=m.checkpoints[actor];m.mu.Unlock()
+ if !armed{return "",errors.New("mailbox was not armed before the request")}
+ timeout,cancel:=context.WithTimeout(ctx,75*time.Second)
+ defer cancel()
+ for attempts:=0;attempts<12;attempts++{
+  link,err:=m.lookup(timeout,actor,checkpoint,"magic_link",allowed,prefixes)
+  if err!=nil{return "",err}
+  if link!=""{
+   m.mu.Lock();delete(m.checkpoints,actor);m.mu.Unlock()
+   return link,nil
+  }
+  select{
+  case <-timeout.Done():return "",errors.New("approved magic link did not arrive")
+  case <-time.After(5*time.Second):
+  }
+ }
+ return "",errors.New("magic link verification window exhausted")
 }
 func (m *IMAPOTP) Wait(ctx context.Context,actor string)(string,error){
  m.mu.Lock();checkpoint,armed:=m.checkpoints[actor];m.mu.Unlock()
