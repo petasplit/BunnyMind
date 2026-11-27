@@ -14,6 +14,8 @@ The v0.20 runtime now recognizes a **complete, validated engagement**:
    exactly match one of `allowed_origins` in the manifest.
 3. The user selected a security role, or the request explicitly includes
    security-assessment terminology and scope/authorization language.
+   Structured `Target:` and `Scope:` lines also permit a deterministic,
+   manifest-approved initial `scoped_read` before any model call.
 4. The actual model toolset exposes `scoped_read`.
 
 A request meeting these conditions automatically selects the security role
@@ -91,3 +93,17 @@ auto-selection versus ordinary chat, provider first-tool choice and
 truthful action-status labels. CI also runs the usual full Antares tests.
 
 No real third-party host is crawled by CI.
+
+### Deterministic kickoff (structured briefs)
+
+A structured `Target: https://app.example.test/path` and
+`Scope: https://app.example.test` (or the exact scoped hostname) trigger
+one real `scoped_read` GET before the first model completion. The tool
+runs through BunnyGuard and the restricted HTTP transport; its call and
+result are persisted in the conversation history. No extra permission is
+assumed from target branding or a vague program name.
+
+The initial status is emitted only after the scope has been validated and
+the actual tool has passed engagement policy preflight. If the model
+requests more tools, intermediate narration is not displayed. If there is
+no tool or authorization is missing, the actual blocker is shown.

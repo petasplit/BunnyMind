@@ -44,7 +44,7 @@ func matchScope(scope string,u *url.URL)bool{
  for _,field:=range strings.FieldsFunc(scope,func(r rune)bool{
   return r==','||r==';'||r==' '||r=='\t'||r=='['||r==']'||r=='('||r==')'
  }){
-  field=strings.Trim(field,".*/")
+  field=strings.Trim(field,"./")
   if field==host||field==strings.TrimPrefix(origin,"https://")||
    field==strings.TrimPrefix(origin,"http://")||field==origin{
    return true
@@ -118,7 +118,6 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
  args,_:=json.Marshal(map[string]any{"url":brief.URL,"method":"GET","preview_bytes":2048})
  call:=llm.ToolCall{ID:newID("tool"),Name:"scoped_read",Arguments:string(args)}
  if err:=emit(Event{Type:EventNotice,Message:"Checking approved scope"});err!=nil{return nil,0,err}
- if err:=emit(Event{Type:EventNotice,Message:"Inspecting target"});err!=nil{return nil,0,err}
  history:=[]llm.Message{{Role:llm.RoleAssistant,ToolCalls:[]llm.ToolCall{call}}}
  if !req.Quiet{
   a.persistAssistant(ctx,sess.ID,modelName,&llm.Response{ToolCalls:[]llm.ToolCall{call}})
@@ -135,7 +134,7 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
  }
  history=appendTurnMessages(history,results,"",nil)
  if len(results)>0&&results[0].isError{
-  if err:=emit(Event{Type:EventNotice,Message:"Initial inspection blocked; reviewing policy and response"});err!=nil{return history,1,err}
+  if err:=emit(Event{Type:EventNotice,Message:"Initial inspection blocked"});err!=nil{return history,1,err}
  }else{
   if err:=emit(Event{Type:EventNotice,Message:"Initial inspection recorded; continuing investigation"});err!=nil{return history,1,err}
  }
