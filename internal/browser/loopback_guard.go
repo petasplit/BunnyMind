@@ -53,7 +53,34 @@ func (s *Session) configureLoopbackGuard(ctx context.Context,c *conn)error{
  }
  gate:=&loopbackGate{origin:origin}
  c.setOnEvent(func(method string,params json.RawMessage,sessionID string){
-  if method!="Fetch.requestPaused"{return}
+  switch method{
+  case "Target.attachedToTarget":
+   var attached struct{
+    SessionID string `json:"sessionId"`
+    TargetInfo struct{
+     TargetID string `json:"targetId"`
+     Type string `json:"type"`
+     URL string `json:"url"`
+    } `json:"targetInfo"`
+   }
+   if json.Unmarshal(params,&attached)==nil&&attached.TargetInfo.Type=="page"{
+    if attached.TargetInfo.TargetID==s.targetID{
+     resumeCtx,cancel:=context.WithTimeout(context.Background(),4*time.Second)
+     _,_=c.send(resumeCtx,attached.SessionID,"Runtime.runIfWaitingForDebugger",nil)
+     cancel()
+    }else{
+     allowed:=&externalGate{allowed:map[string]bool{gate.origin:true}}
+     s.acceptPopup(c,allowed,attached.SessionID,attached.TargetInfo.TargetID,attached.TargetInfo.URL)
+    }
+   }
+   return
+  case "Target.detachedFromTarget":
+   var detached struct{SessionID string `json:"sessionId"`}
+   if json.Unmarshal(params,&detached)==nil&&detached.SessionID!=""{s.removePopup(detached.SessionID)}
+   return
+  case "Fetch.requestPaused":
+  default:return
+  }
   var paused struct{
    RequestID string `json:"requestId"`
    Request struct{
@@ -77,5 +104,10 @@ func (s *Session) configureLoopbackGuard(ctx context.Context,c *conn)error{
   "patterns":[]map[string]string{{"urlPattern":"*","requestStage":"Request"}},
  })
  if err!=nil{return fmt.Errorf("cannot activate page request gate: %w",err)}
+ // The local fixture uses the same paused-target attachment path that
+ // production-approved HTTPS popups use, but never permits nonloopback egress.
+ if _,err:=c.send(ctx,"","Target.setAutoAttach",map[string]any{
+  "autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true,
+ });err!=nil{return fmt.Errorf("cannot guard local popup: %w",err)}
  return nil
 }
