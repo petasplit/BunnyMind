@@ -68,6 +68,18 @@ changes and produces task IDs compatible with the v0.4 task board. No task
 is automatically scheduled or executed, and caller-supplied inventory changes
 do not become verified security facts merely by producing a task.
 
+## v0.9 — Trusted recorder signatures
+
+BunnyMind v0.9 adds an Ed25519 verification package and an offline agent tool
+for signed observations from a separately operated recorder. A verified
+signature provides provenance binding to one lab signer, not proof of
+vulnerability exploitation. The helper CLI can generate/sign synthetic
+observation files in an isolated recorder environment; the model-facing
+tool can only verify using a pinned public key. This closes part of the
+gap between v0.2 caller-supplied evidence and authenticated provenance;
+full independent request replay and source-to-runtime verification remain
+unimplemented.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
