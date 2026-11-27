@@ -6,7 +6,6 @@ import (
  "crypto/ed25519"
  "encoding/base64"
  "encoding/json"
- "errors"
  "io"
  "os"
  "path/filepath"
