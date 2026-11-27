@@ -7,7 +7,6 @@ import (
  "strings"
  "testing"
 
- "github.com/enowdev/antares/internal/bunnyguard"
 )
 
 type adaptiveBrowser struct {
@@ -115,4 +114,3 @@ func TestSnapshotOnlyAcceptsStructuralSelectors(t *testing.T){
   if err:=validateAuthSnapshot(snap);err==nil{t.Fatalf("unsafe selector accepted %q",selector)}
  }
 }
-var _ = bunnyguard.Policy{}
