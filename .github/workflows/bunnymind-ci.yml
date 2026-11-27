@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test ./internal/bunnyharness ./internal/bunnygraph \
+          go test ./internal/bunnyharness ./internal/bunnygraph ./internal/bunnyblackboard \
             -run '^$' -bench '^Benchmark' -benchtime=25x -benchmem \
             | tee bunny-harness-microbench.txt
       - name: Archive reproducible harness measurements
