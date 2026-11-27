@@ -61,8 +61,7 @@ func (s *Store) load(session,id string)([]Turn,error){
 func (s *Store) Append(session,id,question string,f findings.Finding)([]Turn,error){
  if err:=check(session,id);err!=nil{return nil,err}
  question=strings.TrimSpace(question)
- if len(question)<2||len(question)>500||strings.ContainsAny(question,"
-")||unsafeInput.MatchString(question){
+ if len(question)<2||len(question)>500||strings.ContainsAny(question,"\r\n")||unsafeInput.MatchString(question){
   return nil,errors.New("question must be 2..500 characters without secrets or control characters")
  }
  response,digest:=Answer(f,question)
