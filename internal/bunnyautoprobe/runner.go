@@ -41,6 +41,9 @@ type Runner struct{ Proof bunnyscript.Runner }
 func (r Runner) Execute(ctx context.Context,s Spec,policy bunnyguard.Policy)(CampaignResult,error){
  if err:=Validate(s,policy);err!=nil{return CampaignResult{},err}
  if r.Proof.Root==""{return CampaignResult{},errors.New("evidence vault destination required")}
+ release,err:=bunnyquota.ExecutionLease(ctx,r.Proof.Root,s.EngagementID)
+ if err!=nil{return CampaignResult{},fmt.Errorf("adaptive Python execution denied: %w",err)}
+ defer release()
  // Reserve the entire worst-case campaign request envelope *once* across
  // local processes. Individual sub-runs use that reservation and cannot
  // double-charge, nor can another concurrent worker overrun the budget.
@@ -58,6 +61,7 @@ func (r Runner) Execute(ctx context.Context,s Spec,policy bunnyguard.Policy)(Cam
  proof:=r.Proof
  proof.Root=folder
  proof.BudgetReserved=true
+ proof.ExecutionLeaseHeld=true
  result:=CampaignResult{EngagementID:s.EngagementID,CampaignID:s.CampaignID,
   StartedAt:time.Now().UTC().Format(time.RFC3339Nano),Runs:[]Round{},
   Outcome:"inconclusive",
