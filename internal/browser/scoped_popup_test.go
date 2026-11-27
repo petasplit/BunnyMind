@@ -2,6 +2,7 @@ package browser
 
 import (
  "context"
+ "encoding/json"
  "net/http"
  "net/http/httptest"
  "os"
@@ -29,8 +30,11 @@ func TestChromeScopedPopupNavigationAndRestore(t *testing.T){
  s:=New(Options{Executable:executable,LoopbackOrigin:server.URL,Headless:true})
  defer s.Stop()
  if err:=s.Navigate(ctx,server.URL);err!=nil{t.Fatal(err)}
- _,err:=s.Eval(ctx,"document.querySelector('#launch').click()")
+ raw,err:=s.Eval(ctx,"(() => { const r=document.querySelector('#launch').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()")
  if err!=nil{t.Fatal(err)}
+ var coords struct{X,Y float64}
+ if err:=json.Unmarshal(raw,&coords);err!=nil{t.Fatal(err)}
+ if err:=s.ClickXY(ctx,coords.X,coords.Y);err!=nil{t.Fatal(err)}
  switched,err:=s.SwitchToApprovedPopup(ctx)
  if err!=nil||!switched{
   if s.conn!=nil{
