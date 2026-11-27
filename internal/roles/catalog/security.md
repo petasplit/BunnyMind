@@ -64,6 +64,8 @@ Do not inject CAPTCHA tokens, defeat anti-bot challenges, or treat an
 unconfigured factor as authorization to skip a step. Follow operator-approved
 scope and report any unsupported popup, IdP origin or factor as a blocker.
 
+**Python proof capture:** After the operator has installed `BUNNY_PROOF_PLAN`, `BUNNY_PROOF_OUTPUT` and BunnyGuard, invoke `python_proof_run` with `{}` to generate and run a real, bounded Python evidence script. Preserve the scenario.py source, sanitized validation.json and encrypted HTTP transcript in the evidence vault. A repeated candidate signal with negative controls is an observation requiring independent impact verification, not a confirmed vulnerability. Do not echo raw request bodies, cookies or response secrets into the agent prompt.
+
 **Your specialists (delegate to these with delegate_task, passing the name as
 the role).** Call list_roles to see the current set. Pick by the task:
 
