@@ -4,6 +4,7 @@ import (
  "context"
  "net/http"
  "net/http/httptest"
+ "os"
  "sync/atomic"
  "testing"
  "time"
@@ -40,7 +41,11 @@ func TestLoopbackRequestFilterAndBudget(t *testing.T){
  if g.allow("http://127.0.0.1:3000/","GET"){t.Fatal("missing request budget")}
 }
 func TestChromiumNetworkInterceptorBlocksOtherLocalPort(t *testing.T){
- if _,err:=FindExecutable("");err!=nil{t.Skip("Chrome unavailable:",err)}
+ path:=os.Getenv("BUNNY_CHROME")
+ if _,err:=FindExecutable(path);err!=nil{
+  if path!=""{t.Fatal("configured Chromium unavailable:",err)}
+  t.Skip("Chrome unavailable:",err)
+ }
  var otherCalls atomic.Int64
  other:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
   otherCalls.Add(1)
@@ -54,7 +59,7 @@ func TestChromiumNetworkInterceptorBlocksOtherLocalPort(t *testing.T){
  defer site.Close()
  ctx,cancel:=context.WithTimeout(context.Background(),70*time.Second)
  defer cancel()
- s:=New(Options{Headless:true,LoopbackOrigin:site.URL})
+ s:=New(Options{Headless:true,Executable:path,LoopbackOrigin:site.URL})
  defer s.Stop()
  if err:=s.Navigate(ctx,site.URL);err!=nil{t.Fatal(err)}
  time.Sleep(700*time.Millisecond)
