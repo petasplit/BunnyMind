@@ -40,3 +40,27 @@ go test ./internal/bunnyfix ./internal/bunnyauthz ./internal/tools
 To progress beyond simulated tests, a future version must bind signed
 receipts to immutable deployment hashes, independent test accounts,
 operator-approved scope and a separately isolated recorder.
+
+## Standalone demonstration
+
+In the v0.14 development branch, run four synthetic scenarios:
+
+```powershell
+go run ./cmd/bunnyfix-demo -mode remediation -json
+go run ./cmd/bunnyfix-demo -mode regression -json
+go run ./cmd/bunnyfix-demo -mode persistent -json
+go run ./cmd/bunnyfix-demo -mode denied -json
+```
+
+Each command starts two disposable localhost test applications,
+generates fresh random synthetic user tokens, captures and signs owner /
+foreign / anonymous observations for each, then compares the two outcomes.
+
+The GitHub Windows build workflow also produces
+`BunnyMind-fix-demo-windows-x64.exe` and its SHA-256 checksum. The
+native Windows smoke job runs all four modes against the Windows binary
+and validates both eight-sample signed bundles in each scenario.
+
+The fixture and signing key run in the same demo process; these results
+illustrate the evidence pipeline and do **not** provide independent
+production remediation attestation.

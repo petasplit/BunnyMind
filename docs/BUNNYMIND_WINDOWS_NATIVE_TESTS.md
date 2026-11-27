@@ -31,3 +31,14 @@ from an independent real-world recorder.
 The correct next steps for authorized staging assessments are distinct
 isolated identities, explicit scope approval, network-level containment
 for all relevant traffic, and independent repeatable controls.
+
+## v0.14 extension: native before/after regression smoke
+
+The Windows workflow now also builds `BunnyMind-fix-demo-windows-x64.exe`.
+Four native runs are required to pass: `remediation`, `regression`,
+`persistent`, and `denied`. The test checks JSON outcomes and exactly
+eight signed samples in each before/after bundle. All applications bind
+to disposable numeric-loopback ports and use random synthetic credentials.
+
+This validates local runtime behavior only; the code does not make fixes
+to arbitrary applications.

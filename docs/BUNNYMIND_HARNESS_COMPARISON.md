@@ -107,6 +107,19 @@ inconclusive result. This is a real HTTP behavior check **against a local
 synthetic fixture**, not a benchmark on production applications and not a
 general-purpose IDOR/BOLA exploit verifier.
 
+## v0.13/v0.14: Windows execution and signed fix comparisons
+
+BunnyMind v0.13 moves past cross-compilation by downloading its Windows
+demo artifact onto a native Windows GitHub runner and exercising secure
+and deliberately vulnerable local authorization controls with randomized
+synthetic test personas.
+
+BunnyMind v0.14 introduces an offline before/after receipt comparison
+with four explicit lab outcomes (remediation observed, regression observed,
+unchanged exposure, unchanged denial). A native Windows demo exercises all
+four scenarios. Both stages are **synthetic local tests**, not evidence of
+real-world pentesting superiority or verified production fixes.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
