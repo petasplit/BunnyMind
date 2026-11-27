@@ -72,7 +72,7 @@ func Build(p Profile,manifest bunnyguard.Policy)(Schedule,error){
   seen[origin]=true
   weight+=targets[i].Priority
  }
- if manifest.MaxNetworkCalls<len(targets){
+ if manifest.MaxNetworkCalls<len(targets)||p.TimeBudgetMinutes<len(targets){
   return Schedule{},errors.New("engagement request allowance cannot cover all selected origins")
  }
  sort.SliceStable(targets,func(i,j int)bool{
@@ -98,15 +98,15 @@ func Build(p Profile,manifest bunnyguard.Policy)(Schedule,error){
    calls=total-usedRequests
    minutes=p.TimeBudgetMinutes-usedMinutes
   }else{
-   calls=total*t.Priority/weight
+   calls=(total-usedRequests)*t.Priority/weight
    if calls<1{calls=1}
-   minutes=p.TimeBudgetMinutes*t.Priority/weight
+   minutes=(p.TimeBudgetMinutes-usedMinutes)*t.Priority/weight
    if minutes<1{minutes=1}
   }
   // Reserve at least one unit for each remaining target.
   remaining:=len(targets)-i-1
   if calls>total-usedRequests-remaining{calls=total-usedRequests-remaining}
-  if minutes>p.TimeBudgetMinutes-usedMinutes{minutes=p.TimeBudgetMinutes-usedMinutes}
+  if minutes>p.TimeBudgetMinutes-usedMinutes-remaining{minutes=p.TimeBudgetMinutes-usedMinutes-remaining}
   schedule.Allocations=append(schedule.Allocations,Allocation{
    Origin:t.Origin,Priority:t.Priority,MaxRequests:calls,MaxMinutes:minutes,
   })
