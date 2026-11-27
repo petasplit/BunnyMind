@@ -358,6 +358,9 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		}
 		_ = emit(Event{Type: EventDone})
 	}()
+	// A completed authorized engagement starts work immediately, without
+	// requiring the user to manually select the Security Lead role.
+	autoSelectSecurityRole(&req)
 	cfg := a.config()
 
 	prep, err := a.prepareTurn(ctx, &req, emit)
@@ -372,6 +375,10 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 	toolSpecs := prep.toolSpecs
 	byName := prep.byName
 	systemPrompt := prep.systemPrompt
+	rapidSecurity := toolFirstMission(req, toolSpecs)
+	if rapidSecurity {
+		systemPrompt += securityToolFirstInstructions
+	}
 	maxTurns := prep.maxTurns
 	goal := prep.goal
 	hasGoal := prep.hasGoal
@@ -420,8 +427,24 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 			ParallelToolCalls: cfg.Model.ParallelToolCall,
 			PromptCache:       cfg.PromptCaching.Enabled,
 		}
+		toolFirst := rapidSecurity && turn == 1
+		var preamble []Event
+		modelEmit := emit
+		if toolFirst {
+			// Buffer any model-generated narration. A genuine first tool call
+			// discards it; when a provider refuses tools, release the text
+			// rather than hiding an actionable blocker from the operator.
+			modelEmit = func(e Event) error {
+				if e.Type == EventText || e.Type == EventReasoning {
+					if len(preamble) < 256 { preamble = append(preamble, e) }
+					return nil
+				}
+				return emit(e)
+			}
+			llmReq.ToolChoice = "required"
+		}
 
-		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, emit)
+		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)
 		if err == nil {
 			err = validateToolCallArguments(resp)
 		}
@@ -436,13 +459,29 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 			case <-runCtx.Done():
 			case <-time.After(time.Duration(att+1) * 800 * time.Millisecond):
 			}
-			resp, err = a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, emit)
+			preamble = nil
+			resp, err = a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)
 			if err == nil {
 				err = validateToolCallArguments(resp)
 			}
 		}
 		if err != nil {
 			return nil, err
+		}
+		if toolFirst {
+			if len(resp.ToolCalls) > 0 {
+				// No introductory essay should appear in the UI or in the
+				// persisted assistant message preceding a real tool call.
+				resp.Content = ""
+				resp.Reasoning = ""
+			} else {
+				// The provider could not honor required tool selection.
+				// Never invent that a crawl/sign-in ran: surface the actual
+				// text and let normal finalization explain the blocker.
+				for _, e := range preamble {
+					if err := emit(e); err != nil { return nil, err }
+				}
+			}
 		}
 
 		total.InputTokens += resp.Usage.InputTokens

@@ -250,6 +250,14 @@ func (a *Agent) executeTools(
 		}
 		defer cancel()
 
+		// Short, factual action statuses are emitted only after approval
+		// and engagement preflight. A denied tool is never shown as running.
+		if req.Depth == 0 && req.Role == "security" &&
+			strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy)) != "" {
+			if status := securityActionStatus(call.Name); status != "" {
+				_ = safeEmit(Event{Type: EventNotice, Message: status})
+			}
+		}
 		start := time.Now()
 		res := tool.Execute(toolCtx, in)
 		content := trimForModel(res.Content, a.config().Tools.MaxOutputChars)
