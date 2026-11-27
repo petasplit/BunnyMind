@@ -113,3 +113,15 @@ func TestAnonymousControlsExplicit(t *testing.T){
  }
  if _,err:=Assess(pub,p,c);err!=nil{t.Fatal(err)}
 }
+
+func TestAuthzQueryOrFragmentRefused(t *testing.T) {
+ p,_,count:=setupFixture(t,false,false)
+ for _,value:=range []string{"/accounts/owner?token=synthetic","/accounts/owner#fragment"}{
+  p.ResourcePath=value
+  _,privateKey,_:=bunnyreceipt.Keypair()
+  if _,err:=Record(context.Background(),p,privateKey,Tokens{Owner:ownerToken,Foreign:foreignToken});err==nil{
+   t.Fatalf("unsafe resource path %q accepted",value)
+  }
+ }
+ if count.Load()!=0{t.Fatal("invalid plans must not send any requests")}
+}

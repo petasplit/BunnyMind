@@ -93,6 +93,20 @@ independently reproducing vulnerabilities in authorized real applications.
 Evidence authenticity still depends on signing-key isolation, a trusted
 recorder process and sound control experiments.
 
+## v0.12 — Synthetic cross-persona authorization checks
+
+BunnyMind now has an isolated, strictly numeric-loopback recorder for
+differential authorization checks using **two distinct synthetic test-user
+tokens** and an anonymous control. The signed observation format binds a
+non-secret actor label to every sample; raw tokens are not included in
+model-facing inputs or receipts.
+
+The verifier compares legitimate owner access, foreign-user access and
+anonymous denial, reporting either a foreign marker exposure, denial or
+inconclusive result. This is a real HTTP behavior check **against a local
+synthetic fixture**, not a benchmark on production applications and not a
+general-purpose IDOR/BOLA exploit verifier.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
@@ -104,7 +118,8 @@ recorder process and sound control experiments.
 4. Ingest v0.6 graph snapshots from trusted captures and source scans, then
    connect v0.8 review suggestions to the durable engagement coordinator with
    explicitly approved scheduling and stale-result invalidation.
-5. Documented authentication test personas and non-production test sessions.
+5. Extend the v0.12 synthetic persona tests to a trusted staging account
+   manager, with explicit consent, credential isolation and replayable controls.
 6. Bounded, resumable verifier/fix/review workflows with operator approvals,
    deterministic lab success gates, cost/time budgets and rollback.
 7. Trusted CI and benchmark runs: fixed datasets, five or more repetitions,

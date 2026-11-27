@@ -7,8 +7,8 @@ isolated numeric-loopback application**.
 The recorder submits three personas: `owner`, `foreign`, and
 `anonymous`. Owner and foreign synthetic bearer tokens are held in a
 private in-memory `Tokens` structure, never in the JSON plan or signed
-observation. Tokens must be distinct; the recorder rejects missing or
-malformed tokens *before sending requests*. The existing `bunnylab`
+observation. Tokens must be distinct; query strings and URL fragments in the
+resource path are prohibited. The recorder rejects missing or malformed tokens *before sending requests*. The existing `bunnylab`
 recorder still limits requests to GET on numeric loopback addresses, does
 not follow redirects, and caps response data to 64 KiB.
 
