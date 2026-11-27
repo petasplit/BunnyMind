@@ -106,8 +106,9 @@ func (s *Session) configureLoopbackGuard(ctx context.Context,c *conn)error{
  if err!=nil{return fmt.Errorf("cannot activate page request gate: %w",err)}
  // The local fixture uses the same paused-target attachment path that
  // production-approved HTTPS popups use, but never permits nonloopback egress.
- if _,err:=c.send(ctx,s.pageSess,"Target.setAutoAttach",map[string]any{
-  "autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true,
+ if _,err:=c.send(ctx,"","Target.autoAttachRelated",map[string]any{
+  "targetId":s.targetID,"waitForDebuggerOnStart":true,
+  "filter":[]map[string]any{{"type":"page","exclude":false}},
  });err!=nil{return fmt.Errorf("cannot guard local popup: %w",err)}
  return nil
 }
