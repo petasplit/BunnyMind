@@ -26,35 +26,7 @@ type DiscoveryBrowser interface {
  Browser
  DiscoverAuth(context.Context)(AuthPageState,error)
 }
-var safeDiscoverySelector=regexp.MustCompile(`^(?:#bm-auto-(?:field|submit)-[0-9]{1,3}|\[data-bm-auth="bm-auto-(?:field|submit)-[0-9]{1,3}"\])package bunnybrowserflow
-
-import (
- "context"
- "errors"
- "regexp"
-)
-
-// A discovered control is only a stable synthetic selector and a semantic
-// category. No DOM input value, label text, page body, cookie or credential is
-// returned to the planner or agent.
-type DiscoveredField struct {
- Selector string `json:"selector"`
- Role string `json:"role"`
-}
-type AuthPageState struct {
- Kind string `json:"kind"`
- Fields []DiscoveredField `json:"fields"`
- SubmitSelector string `json:"submit_selector,omitempty"`
- SignupPath string `json:"signup_path,omitempty"`
- LoginPath string `json:"login_path,omitempty"`
- Ambiguous bool `json:"ambiguous"`
- Challenge string `json:"challenge,omitempty"`
-}
-type DiscoveryBrowser interface {
- Browser
- DiscoverAuth(context.Context)(AuthPageState,error)
-}
-)
+var safeDiscoverySelector=regexp.MustCompile(`^(?:#bm-auto-(?:field|submit)-[0-9]{1,3}|\[data-bm-auth="bm-auto-(?:field|submit)-[0-9]{1,3}"\])$`)
 // Discovery deliberately accepts no arbitrary selectors from model output.
 func validateDiscovery(d AuthPageState)error {
  if len(d.Fields)>8{return errors.New("too many authentication controls")}
