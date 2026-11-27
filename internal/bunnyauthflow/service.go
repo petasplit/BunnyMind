@@ -21,6 +21,7 @@ import (
 
 const Sender = "no-reply@bunnymind.test"
 const MaxAttempts=3
+const MaxAccounts=8
 const OTPExpiry=5*time.Minute
 var allowedEmail=regexp.MustCompile(`^[a-z0-9][a-z0-9._+-]{1,60}@example[.]test$`)
 var codeRE=regexp.MustCompile(`\b[0-9]{6}\b`)
@@ -133,6 +134,7 @@ func (s *Service) register(w http.ResponseWriter,r *http.Request){
  if !decode(r,&args)||!allowedEmail.MatchString(args.Email){deny(w,400);return}
  s.mu.Lock();defer s.mu.Unlock()
  if _,exists:=s.accounts[args.Email];exists{deny(w,409);return}
+ if len(s.accounts)>=MaxAccounts{deny(w,429);return}
  id,err:=secureHex(12);if err!=nil{deny(w,500);return}
  marker,err:=secureHex(24);if err!=nil{deny(w,500);return}
  a:=&account{email:args.Email,id:id,marker:marker}
