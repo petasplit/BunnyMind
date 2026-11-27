@@ -80,6 +80,11 @@ func TestModelAggregation(t *testing.T){
  s.Trials=append(s.Trials,SignedTrial{RunID:"run_b",Model:"second-model",Reported:[]string{"C1","C2"},
  Bundles:[]bunnyreceipt.Bundle{mkBundle(t,priv,"run_b","C1",true),mkBundle(t,priv,"run_b","C2",true)}})
  result,err:=ScoreSignedStudy(pub,s);if err!=nil{t.Fatal(err)}
- if len(result.Models)!=2||result.Models[1].MeanRecall!=1{t.Fatalf("%+v",result.Models)}
+ if len(result.Models)!=2{t.Fatalf("expected two models: %+v",result.Models)}
+ found:=false
+ for _,model:=range result.Models{
+  if model.Model=="second-model"{found=true;if model.MeanRecall!=1{t.Fatalf("wrong second-model recall: %+v",model)}}
+ }
+ if !found{t.Fatal("second model missing")}
  if !strings.Contains(result.Disclaimer,"signatures"){t.Fatal("missing provenance disclaimer")}
 }
