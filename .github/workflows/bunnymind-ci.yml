@@ -62,7 +62,7 @@ jobs:
           chrome-version: stable
       - name: Verify browser network interception and private-persona OTP
         env:
-          CHROME: ${{ steps.chrome.outputs.chrome-path }}
+          BUNNY_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           go test ./internal/browser ./internal/bunnybrowserflow \
             -run 'TestChromiumNetworkInterceptorBlocksOtherLocalPort|TestChromeLoopbackEmailAndSessionIsolation' \
