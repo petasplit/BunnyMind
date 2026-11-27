@@ -291,6 +291,12 @@ func (s *Session) Start(ctx context.Context) error {
    return err
   }
  }
+ if s.opts.VirtualPasskey{
+  if err:=s.setupVirtualPasskey(ctx,c,s.pageSess);err!=nil{
+   s.killLocked()
+   return err
+  }
+ }
 	_, _ = c.send(ctx, s.pageSess, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": s.opts.Width, "height": s.opts.Height, "deviceScaleFactor": 1, "mobile": false,
 	})
