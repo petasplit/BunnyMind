@@ -59,6 +59,7 @@ type SampleReceipt struct{
  RequestSHA256 string `json:"request_sha256"`
  ResponseSHA256 string `json:"response_sha256"`
  MarkerPresent bool `json:"marker_present"`
+ MarkerInRequest bool `json:"marker_in_request"`
  Truncated bool `json:"truncated"`
  ObservedAt string `json:"observed_at"`
 }
