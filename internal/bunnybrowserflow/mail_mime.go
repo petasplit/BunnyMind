@@ -17,7 +17,7 @@ import (
 // The IMAP adapter parses only small text parts and never returns the mail
 // body to a caller. Attachments and non-text parts are intentionally ignored.
 const maxMailBytes=32768
-var htmlTags=regexp.MustCompile(`<[^>]{1,1024}>`)
+var htmlTags=regexp.MustCompile(`<[^>]+>`)
 
 func decodedBody(reader io.Reader,encoding string)(string,error){
  switch strings.ToLower(strings.TrimSpace(encoding)){
