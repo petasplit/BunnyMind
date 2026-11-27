@@ -8,6 +8,8 @@ An operator-defined mode (`login` or `signup`), entry path, test personas, expec
 
 The adaptive runner uses the v0.24 HTTPS scope controls (strict BunnyGuard origins, explicit POST path allowlist, DNS-pinned local CONNECT proxy, request limits and pacing) and the v0.25 redacted traffic receipt recorder. Nothing in this milestone grants arbitrary target discovery or WAF bypass.
 
+The discovered-link navigator can also find a same-origin sign-in or registration link on a landing page and visit its validated path. When an authenticated run succeeds, BunnyMind derives up to eight evidence-linked `next_checks` (authorization controls, session lifecycle, state-changing endpoints, redirects, errors or transport recovery). If the current session has no investigation board, it seeds a **review-only** board with those tasks. It never overwrites an existing board or executes exploit requests based on the generated labels.
+
 ## Real mailbox verification
 
 The optional IMAP adapter connects over verified TLS on port 993 to the operator-configured mailbox hostname. It validates all resolved addresses against private, loopback and special-use ranges, dials a checked IP, and verifies the expected TLS server name.
