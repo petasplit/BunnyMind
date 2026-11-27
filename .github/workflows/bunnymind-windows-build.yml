@@ -52,3 +52,40 @@ jobs:
             dist/BunnyMind-authz-demo-windows-x64.exe
             dist/SHA256SUMS.txt
           retention-days: 7
+
+  windows-native-smoke:
+    needs: windows-x64
+    runs-on: windows-latest
+    steps:
+      - name: Download compiled Windows executables
+        uses: actions/download-artifact@v4
+        with:
+          name: BunnyMind-windows-x64-ci
+          path: dist
+      - name: Run secure and deliberately vulnerable localhost scenarios
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'dist/BunnyMind-authz-demo-windows-x64.exe'
+          if (-not (Test-Path $exe)) { throw "Windows demo executable missing" }
+          $secureRaw = & $exe -json
+          if ($LASTEXITCODE -ne 0) { throw "Secure demo exited with $LASTEXITCODE" }
+          $secure = ($secureRaw -join "`n") | ConvertFrom-Json
+          if ($secure.outcome -ne 'cross_persona_denied_in_lab' -or
+              -not $secure.owner_access_observed -or
+              -not $secure.foreign_denied_observed -or
+              $secure.signed_samples -ne 8) {
+            throw "Secure localhost authorization regression failed"
+          }
+          $vulnerableRaw = & $exe -vulnerable -json
+          if ($LASTEXITCODE -ne 0) { throw "Vulnerable demo exited with $LASTEXITCODE" }
+          $vulnerable = ($vulnerableRaw -join "`n") | ConvertFrom-Json
+          if ($vulnerable.outcome -ne 'cross_persona_marker_observed_in_lab' -or
+              -not $vulnerable.owner_access_observed -or
+              -not $vulnerable.foreign_marker_observed -or
+              $vulnerable.signed_samples -ne 8) {
+            throw "Deliberately vulnerable localhost scenario was not detected"
+          }
+          Write-Host 'PASS: Windows secure fixture denied cross-user access'
+          Write-Host 'PASS: Windows deliberately vulnerable fixture exposed synthetic marker'
+          Write-Host 'PASS: both scenarios produced eight signed synthetic samples'

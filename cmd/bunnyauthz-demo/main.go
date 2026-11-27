@@ -4,6 +4,8 @@ package main
 
 import (
  "context"
+ "crypto/rand"
+ "encoding/base64"
  "encoding/json"
  "flag"
  "fmt"
@@ -15,11 +17,21 @@ import (
  "github.com/enowdev/antares/internal/bunnyreceipt"
 )
 
+// testPersonaToken creates an ephemeral random synthetic bearer token.
+// It is never logged, serialized, or passed to an agent tool.
+func testPersonaToken()(string,error){
+ b:=make([]byte,32)
+ if _,err:=rand.Read(b);err!=nil{return "",err}
+ return base64.RawURLEncoding.EncodeToString(b),nil
+}
 func main(){
  vulnerable:=flag.Bool("vulnerable",false,"simulate an intentionally vulnerable local cross-user access rule")
+ jsonOnly:=flag.Bool("json",false,"emit JSON-only result for native CI")
  flag.Parse()
- const owner="BUNNY_LAB_ONLY_OWNER_TOKEN_EXAMPLE"
- const foreign="BUNNY_LAB_ONLY_FOREIGN_TOKEN_EXAMPLE"
+ owner,err:=testPersonaToken()
+ if err!=nil{fmt.Fprintln(os.Stderr,"cannot create owner test persona:",err);os.Exit(1)}
+ foreign,err:=testPersonaToken()
+ if err!=nil{fmt.Fprintln(os.Stderr,"cannot create foreign test persona:",err);os.Exit(1)}
  const marker="SYNTHETIC_OWNER_RESOURCE_PROOF_123"
  fixture:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
   if r.Method!="GET"||r.URL.Path!="/accounts/owner"{
@@ -58,8 +70,10 @@ func main(){
  // No signing key, session token, response body or marker is emitted.
  output,err:=json.MarshalIndent(assessment,"","  ")
  if err!=nil{fmt.Fprintln(os.Stderr,err);os.Exit(1)}
- fmt.Println("BunnyMind v0.12 synthetic authorization lab")
- fmt.Println("Warning: this demonstration's signer and fixture are in the same process; it does not provide independent real-world attestation.")
+ if !*jsonOnly{
+  fmt.Println("BunnyMind v0.13 synthetic authorization lab")
+  fmt.Println("Warning: signer and fixture share a process; results demonstrate local-only test behavior.")
+ }
  fmt.Println(string(output))
  if (!*vulnerable && assessment.Outcome!="cross_persona_denied_in_lab") ||
   (*vulnerable && assessment.Outcome!="cross_persona_marker_observed_in_lab"){
