@@ -127,9 +127,7 @@ func Analyze(r io.Reader, allowedOrigins []string) (Summary,error) {
 		if auth{s.AuthenticatedRequests++}
 		// Include only method + origin + path in a one-way fingerprint.
 		// Query strings and fragments never reach the output.
-		h:=sha256.Sum256([]byte(m+"
-"+origin+"
-"+u.EscapedPath()))
+		h:=sha256.Sum256([]byte(m+"\n"+origin+"\n"+u.EscapedPath()))
 		key:="ep_"+hex.EncodeToString(h[:12])
 		ep,ok:=aggregated[key]
 		if !ok{
