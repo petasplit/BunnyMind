@@ -20,11 +20,11 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Guard unit tests
-        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/tools -count=1
+        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnybench ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench ./cmd/bunnyreceipt-recorder ./cmd/bunnybench-signed ./internal/bunnylab ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools -count=1
       - name: Verify agent integration
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
-        run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./cmd/bunnybench-signed ./internal/tools ./internal/agent ./internal/config
+        run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/bunnyblackboard ./internal/bunnyplanner ./internal/bunnyreceipt ./internal/bunnylab ./cmd/bunnybench-signed ./cmd/bunnylab-recorder ./cmd/bunnylab-fixture ./internal/tools ./internal/agent ./internal/config
 
   harness-microbench:
     runs-on: ubuntu-latest

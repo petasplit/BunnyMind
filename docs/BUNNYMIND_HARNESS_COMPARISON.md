@@ -80,6 +80,19 @@ gap between v0.2 caller-supplied evidence and authenticated provenance;
 full independent request replay and source-to-runtime verification remain
 unimplemented.
 
+## v0.11 — locally observed and signed evidence
+
+The v0.11 loopback recorder adds a concrete observed HTTP capture path:
+a strictly local-only GET transport records actual fixture responses,
+computes marker flags and response digests, then signs the observations
+with an isolated recorder key. A synthetic fixture and JSON plan exercise
+this in tests and from a CLI.
+
+This is limited to numeric loopback IPs and is not a substitute for
+independently reproducing vulnerabilities in authorized real applications.
+Evidence authenticity still depends on signing-key isolation, a trusted
+recorder process and sound control experiments.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
