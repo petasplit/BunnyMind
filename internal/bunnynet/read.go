@@ -61,7 +61,7 @@ func New(p Policy)(*Reader,error){
 func (r *Reader) allowedIP(ip net.IP, targetLiteral net.IP) bool{
  if ip==nil||ip.IsUnspecified()||ip.IsMulticast(){return false}
  // An explicit IP literal is authorized ONLY for that exact address.
- if targetLiteral!=nil&&targetLiteral.Equal(ip){return true}
+ if targetLiteral!=nil{return targetLiteral.Equal(ip)}
  if ip.IsLoopback()||ip.IsPrivate()||ip.IsLinkLocalUnicast()||ip.IsLinkLocalMulticast()||!ip.IsGlobalUnicast(){
   for _,cidr:=range r.networks{if cidr.Contains(ip){return true}}
   return false
