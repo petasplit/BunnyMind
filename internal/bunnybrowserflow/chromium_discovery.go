@@ -81,6 +81,15 @@ const authDiscoveryScript = `(() => {
      if (candidates === 1) submit = safeRef(el,'submit',1);
    }
  }
+ let passkeySelector = '';
+ let passkeyCandidates=0;
+ for (const el of controls) {
+   const descriptor=((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')).trim().toLowerCase().slice(0,100);
+   if (/(passkey|security key|windows hello|touch.?id|face.?id)/.test(descriptor)) {
+     passkeyCandidates++;
+     if (passkeyCandidates===1) passkeySelector=safeRef(el,'passkey',1);
+   }
+ }
  const challenged = !!document.querySelector('iframe[src*="captcha"], iframe[src*="turnstile"], .g-recaptcha, [data-sitekey]');
  let challenge = challenged ? 'anti_bot' : '';
  // These are official public *test* sitekeys, not a CAPTCHA bypass.
@@ -93,7 +102,7 @@ const authDiscoveryScript = `(() => {
  const captchaTestKey = !!challenge && testWidgets.length>0 &&
    testWidgets.every(el => testSitekeys.has(el.getAttribute('data-sitekey')||''));
  const tokenFields=collect('[name="cf-turnstile-response"],[name="g-recaptcha-response"]');
- const captchaReady=!!captchaTestKey && tokenFields.some(el=>typeof el.value==='string'&&el.value.length>10);
+ const captchaReady=!!challenge && tokenFields.some(el=>typeof el.value==='string'&&el.value.length>10);
 
 
  if (!challenge && document.querySelector('input[autocomplete="webauthn"]')) challenge='passkey';
@@ -139,7 +148,7 @@ const authDiscoveryScript = `(() => {
  }
  return {kind,fields,submit_selector:submit,ambiguous:candidates>1||providers>1,
    challenge,signup_path:signupPath,login_path:loginPath,
-   provider_selector:providerSelector,captcha_test_key:captchaTestKey,captcha_ready:captchaReady};
+   provider_selector:providerSelector,passkey_selector:passkeyCandidates===1?passkeySelector:'',captcha_test_key:captchaTestKey,captcha_ready:captchaReady};
 })()`
 
 func (d *chromeDriver) DiscoverAuth(ctx context.Context)(AuthPageState,error){

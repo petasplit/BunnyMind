@@ -94,28 +94,61 @@ func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
  if err!=nil{return err}
  if _,err:=externalProxyAddress(s.opts.ExternalProxyURL);err!=nil{return err}
  c.setOnEvent(func(method string,params json.RawMessage,sessionID string){
-  if method!="Fetch.requestPaused"{return}
-  var event struct{
-   RequestID string `json:"requestId"`
-   Request struct{
-    URL string `json:"url"`
-    Method string `json:"method"`
-   } `json:"request"`
+  switch method{
+  case "Target.attachedToTarget":
+   var attached struct {
+    SessionID string `json:"sessionId"`
+    TargetInfo struct{
+     TargetID string `json:"targetId"`
+     Type string `json:"type"`
+     URL string `json:"url"`
+    } `json:"targetInfo"`
+   }
+   if json.Unmarshal(params,&attached)==nil&&attached.TargetInfo.Type=="page"{
+    if attached.TargetInfo.TargetID==s.targetID{
+     resumeCtx,cancel:=context.WithTimeout(context.Background(),4*time.Second)
+     _,_=c.send(resumeCtx,attached.SessionID,"Runtime.runIfWaitingForDebugger",nil)
+     cancel()
+    }else{
+     s.acceptPopup(c,g,attached.SessionID,attached.TargetInfo.TargetID,attached.TargetInfo.URL)
+    }
+   }
+   return
+  case "Target.detachedFromTarget":
+   var detached struct{SessionID string `json:"sessionId"`}
+   if json.Unmarshal(params,&detached)==nil&&detached.SessionID!=""{
+    s.removePopup(detached.SessionID)
+   }
+   return
+  case "Fetch.requestPaused":
+   var event struct{
+    RequestID string `json:"requestId"`
+    Request struct{
+     URL string `json:"url"`
+     Method string `json:"method"`
+    } `json:"request"`
+   }
+   if json.Unmarshal(params,&event)!=nil||event.RequestID==""{return}
+   cmd:="Fetch.continueRequest"
+   arg:=map[string]any{"requestId":event.RequestID}
+   if !g.allow(event.Request.URL,event.Request.Method){
+    g.blocked.Add(1)
+    cmd="Fetch.failRequest"
+    arg["errorReason"]="BlockedByClient"
+   }
+   actionCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second)
+   defer cancel()
+   _,_=c.send(actionCtx,sessionID,cmd,arg)
   }
-  if json.Unmarshal(params,&event)!=nil||event.RequestID==""{return}
-  cmd:="Fetch.continueRequest"
-  arg:=map[string]any{"requestId":event.RequestID}
-  if !g.allow(event.Request.URL,event.Request.Method){
-   g.blocked.Add(1)
-   cmd="Fetch.failRequest"
-   arg["errorReason"]="BlockedByClient"
-  }
-  actionCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second)
-  defer cancel()
-  _,_=c.send(actionCtx,sessionID,cmd,arg)
  })
  if _,err:=c.send(ctx,s.pageSess,"Fetch.enable",map[string]any{
   "patterns":[]map[string]string{{"urlPattern":"*","requestStage":"Request"}},
  });err!=nil{return fmt.Errorf("cannot activate external browser scope: %w",err)}
+ // New popup pages attach frozen; each receives the same request gate before
+ // navigating. The DNS-pinned local proxy also rejects offscope destinations.
+ if _,err:=c.send(ctx,"","Target.setAutoAttach",map[string]any{
+  "autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true,
+  "filter":[]map[string]any{{"type":"page","exclude":false}},
+ });err!=nil{return fmt.Errorf("cannot guard new browser tabs: %w",err)}
  return nil
 }

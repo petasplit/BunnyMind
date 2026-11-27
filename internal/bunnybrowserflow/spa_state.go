@@ -35,6 +35,9 @@ func awaitAuthProgress(ctx context.Context,b Browser,discover DiscoveryBrowser,
   if err!=nil{return false,errors.New("browser navigation unavailable")}
   if _,err:=approvedOriginOf(urlNow,allowed);err!=nil{return false,err}
   if signed,e:=b.Contains(ctx,successText);e==nil&&signed{return true,nil}
+  if popup,ok:=b.(PopupBrowser);ok{
+   if signed,e:=popup.ParentHasText(ctx,successText);e==nil&&signed{return true,nil}
+  }
   var state AuthPageState
   if scoped,ok:=discover.(ScopedDiscoveryBrowser);ok{
    state,err=scoped.DiscoverAuthScoped(ctx,idps)

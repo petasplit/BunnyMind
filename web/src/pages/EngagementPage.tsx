@@ -21,6 +21,7 @@ import { Skeleton, SkeletonList } from '@/components/ui/skeleton'
 import { SearchSelect } from '@/components/ui/SearchSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Markdown } from '@/components/chat/Markdown'
+import { FindingChatPanel } from '@/components/engagement/FindingChatPanel'
 
 interface Phase {
   name: string
@@ -171,6 +172,12 @@ export default function EngagementPage() {
           <DownloadSimple className="size-3.5" />
           <span className="hidden sm:inline">{t('engagement.downloadReport')}</span>
         </Button>
+        <Button variant="outline" size="sm" disabled={!active}
+          onClick={() => downloadFile('/engagement/sarif?session=' + encodeURIComponent(active),
+            'bunnymind-findings.sarif').catch(() => {})}
+          aria-label="Export findings as SARIF">
+          Export SARIF
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -206,14 +213,16 @@ export default function EngagementPage() {
       {tab === 'raw' ? (
         <RawReport session={active} title={activeTitle} />
       ) : (
-        <Overview eng={eng} />
+        <Overview eng={eng} session={active} />
       )}
     </PageLayout>
   )
 }
 
-function Overview({ eng }: { eng: Engagement | null }) {
+function Overview({ eng, session }: { eng: Engagement | null; session: string }) {
   const { t } = useI18n()
+  const [selectedFinding, setSelectedFinding] = useState('')
+  useEffect(() => setSelectedFinding(''), [session])
   const findings = [...(eng?.findings ?? [])].sort(
     (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9),
   )
@@ -361,10 +370,23 @@ function Overview({ eng }: { eng: Engagement | null }) {
                 {f.status && f.status !== 'new' && f.status !== 'confirmed' ? (
                   <Badge variant="outline">{f.status}</Badge>
                 ) : null}
+                <Button variant="outline" size="sm" onClick={() => setSelectedFinding(selectedFinding === f.id ? '' : f.id)}
+                  aria-label={'Discuss finding ' + f.id}>
+                  {selectedFinding === f.id ? 'Close discussion' : 'Discuss'}
+                </Button>
               </div>
             ))}
           </div>
         )}
+        {selectedFinding ? (
+          <FindingChatPanel
+            key={session + '-' + selectedFinding}
+            session={session}
+            findingID={selectedFinding}
+            title={findings.find((f) => f.id === selectedFinding)?.title ?? selectedFinding}
+            onClose={() => setSelectedFinding('')}
+          />
+        ) : null}
       </Card>
 
       {/* Intel */}

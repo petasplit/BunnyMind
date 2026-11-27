@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/enowdev/antares/internal/stealth"
@@ -32,6 +33,12 @@ type Session struct {
 	started   bool
 	userAgent string
 	tempDir   string // a profile dir we minted and must remove on Stop
+ popupMu sync.Mutex
+ popupSessions []popupSession
+ parentSession string
+ popupMax int
+ virtualReady atomic.Bool
+
 }
 
 // New builds an unstarted session.
@@ -286,10 +293,17 @@ func (s *Session) Start(ctx context.Context) error {
    return err
   }
  }
+ if s.opts.VirtualPasskey{
+  if err:=s.setupVirtualPasskey(ctx,c,s.pageSess);err!=nil{
+   s.killLocked()
+   return err
+  }
+ }
 	_, _ = c.send(ctx, s.pageSess, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": s.opts.Width, "height": s.opts.Height, "deviceScaleFactor": 1, "mobile": false,
 	})
 
+ s.parentSession=s.pageSess
 	s.started = true
 	s.lastUsed = time.Now()
 	return nil
@@ -314,6 +328,12 @@ func (s *Session) killLocked() {
 	}
 	s.started = false
 	s.pageSess = ""
+ s.popupMu.Lock()
+ s.popupSessions=nil
+ s.popupMax=0
+ s.popupMu.Unlock()
+ s.parentSession=""
+ s.virtualReady.Store(false)
 	s.targetID = ""
 	if s.tempDir != "" {
 		_ = os.RemoveAll(s.tempDir)

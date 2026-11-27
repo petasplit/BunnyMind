@@ -40,7 +40,7 @@ func RunConfiguredAdaptive(ctx context.Context,scope ApprovedScope,cfg AdaptiveC
  defer egress.Close()
  factory:=ApprovedChromiumFactory{
   Executable:os.Getenv("BUNNY_CHROME"),ProxyURL:proxyURL,
-  Headless:headless,Scope:scope,
+  Headless:headless,Scope:scope,VirtualPasskey:cfg.PasskeyMode=="virtual_test",
  }
  var otp OTPProvider
  if cfg.UseEmailOTP||cfg.UseMagicLink{

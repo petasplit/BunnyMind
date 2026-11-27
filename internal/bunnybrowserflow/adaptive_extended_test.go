@@ -60,6 +60,9 @@ func (b *extendedBrowser) DiscoverAuth(_ context.Context)(AuthPageState,error){
    {Selector:"#bm-auto-field-2",Role:"password"},
   },SubmitSelector:"#bm-auto-submit-1"},nil
  }
+ if b.kind=="passkey"{
+  return AuthPageState{Kind:"login",PasskeySelector:"#bm-auto-passkey-1"},nil
+ }
  if b.kind=="captcha"{
   return AuthPageState{Kind:"challenge",Challenge:"anti_bot",CaptchaTestKey:true,CaptchaReady:true,
    Fields:[]DiscoveredField{{Selector:"#bm-auto-field-1",Role:"email"}},SubmitSelector:"#bm-auto-submit-1"},nil
@@ -138,5 +141,35 @@ func TestUnapprovedIdPFailsPreflight(t *testing.T){
  cfg:=baseExtendedConfig();cfg.IdPOrigins=[]string{"https://evil.example"}
  if err:=ValidateAdaptive(cfg,extendedScope(),extendedManifest());err==nil{
   t.Fatal("SSO origin not in engagement accepted")
+ }
+}
+
+func TestPlatformPasskeyDispatchAndNaturalCaptcha(t *testing.T){
+ cfg:=baseExtendedConfig()
+ cfg.PasskeyMode="platform"
+ factory:=&extendedFactory{kind:"passkey"}
+ out,err:=RunAdaptive(context.Background(),cfg,extendedScope(),extendedManifest(),factory,extendedSecrets{},nil,nil)
+ if err!=nil||out.Actors!=1||out.StepsCompleted<1{
+  t.Fatalf("browser-native passkey flow did not run: %+v %v",out,err)
+ }
+ cfg=baseExtendedConfig();cfg.AllowNaturalCaptcha=true
+ out,err=RunAdaptive(context.Background(),cfg,extendedScope(),extendedManifest(),
+  &extendedFactory{kind:"captcha"},extendedSecrets{},nil,nil)
+ if err!=nil||out.Actors!=1{t.Fatalf("provider-generated CAPTCHA response not accepted: %+v %v",out,err)}
+}
+func TestVirtualPasskeyNeedsOperatorScopedTestMode(t *testing.T){
+ cfg:=baseExtendedConfig()
+ cfg.PasskeyMode="virtual_test"
+ scope:=extendedScope()
+ if err:=ValidateAdaptive(cfg,scope,extendedManifest());err==nil{
+  t.Fatal("virtual authenticator allowed without explicit scope approval")
+ }
+ scope.AllowVirtualPasskey=true
+ if err:=ValidateAdaptive(cfg,scope,extendedManifest());err!=nil{
+  t.Fatalf("approved virtual authenticator rejected: %v",err)
+ }
+ cfg.PasskeyMode="unexpected"
+ if err:=ValidateAdaptive(cfg,scope,extendedManifest());err==nil{
+  t.Fatal("unrecognized WebAuthn option accepted")
  }
 }
