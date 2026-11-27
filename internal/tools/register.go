@@ -21,6 +21,7 @@ func init() {
 		taskTool{},
 		browserTool{},
 		listRolesTool{},
+		evidenceReviewTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},

@@ -16,8 +16,8 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Guard unit tests
-        run: go test ./internal/bunnyguard -count=1
+        run: go test ./internal/bunnyguard ./internal/bunnyevidence ./internal/tools -count=1
       - name: Verify agent integration
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
-        run: go vet ./internal/bunnyguard ./internal/agent ./internal/config
+        run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/tools ./internal/agent ./internal/config
