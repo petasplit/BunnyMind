@@ -26,7 +26,35 @@ const (
  OpHandoff="operator_handoff"
 )
 var validActor=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
-var validSelector=regexp.MustCompile(`^[a-zA-Z0-9_#.[]=-'" ]{1,100}$`)
+var validSelector=regexp.MustCompile(`^[a-zA-Z0-9_#.= -]{1,100}// Package bunnybrowserflow runs constrained, operator-authored account
+// workflows in isolated browser profiles. It never selects public targets,
+// creates credentials, or bypasses a verification challenge on its own.
+package bunnybrowserflow
+
+import (
+ "context"
+ "crypto/sha256"
+ "encoding/hex"
+ "errors"
+ "fmt"
+ "net"
+ "net/url"
+ "regexp"
+ "strings"
+ "time"
+)
+
+const (
+ MaxActors=4
+ MaxSteps=32
+ OpNavigate="navigate"
+ OpFill="fill_secret"
+ OpClick="click"
+ OpAssert="assert_text"
+ OpHandoff="operator_handoff"
+)
+var validActor=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+)
 var validKey=regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 var validPath=regexp.MustCompile(`^/[a-zA-Z0-9_./%-]{0,255}$`)
 
@@ -86,13 +114,13 @@ func Origin(raw string)(string,error){
 }
 func safePath(path string)bool{
  if !validPath.MatchString(path)||strings.HasPrefix(path,"//")||
-  strings.Contains(path,"\")||strings.Contains(path,"%2f")||strings.Contains(path,"%2F")||
+  strings.Contains(path,"\\")||strings.Contains(path,"%2f")||strings.Contains(path,"%2F")||
   strings.Contains(path,"%5c")||strings.Contains(path,"%5C"){return false}
  for _,segment:=range strings.Split(path,"/"){
   if segment=="."||segment==".."{return false}
  }
  decoded,err:=url.PathUnescape(path)
- if err!=nil||strings.HasPrefix(decoded,"//")||strings.Contains(decoded,"\"){return false}
+ if err!=nil||strings.HasPrefix(decoded,"//")||strings.Contains(decoded,"\\"){return false}
  for _,segment:=range strings.Split(decoded,"/"){
   if segment=="."||segment==".."{return false}
  }
@@ -125,8 +153,7 @@ func Validate(p Plan)error {
    }
   case OpAssert:
    if !initialized[s.Actor]||len(s.ExpectedText)<1||len(s.ExpectedText)>80||
-    strings.ContainsAny(s.ExpectedText,"
-")||s.Selector!=""||
+    strings.ContainsAny(s.ExpectedText,"\r\n")||s.Selector!=""||
     s.Path!=""||s.SecretKey!=""||s.ChallengeKind!=""{
     return fmt.Errorf("step %d has invalid assertion",i+1)
    }
