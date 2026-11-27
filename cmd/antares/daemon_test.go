@@ -154,7 +154,11 @@ func TestDaemonCLILifecycle(t *testing.T) {
 	startAt := time.Now()
 	out, err := run("serve")
 	if err != nil {
-		t.Fatalf("serve: %v\n%s", err, out)
+		// Capture the child daemon's actual diagnostic log while the test's
+		// temporary home still exists. Without it, CI only prints a generic
+		// "process exited during startup" and the root cause is lost.
+		daemonLog, logErr := os.ReadFile(filepath.Join(home, "logs", "daemon.log"))
+		t.Fatalf("serve: %v\n%s\ndaemon log (read error: %v):\n%s", err, out, logErr, daemonLog)
 	}
 	if time.Since(startAt) > 10*time.Second || !strings.Contains(out, "started in background") {
 		t.Fatalf("serve did not detach promptly: %s after %s", out, time.Since(startAt))
