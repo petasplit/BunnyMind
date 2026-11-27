@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/enowdev/antares/internal/board"
+	"github.com/enowdev/antares/internal/bunnyguard"
 	"github.com/enowdev/antares/internal/checkpoint"
 	"github.com/enowdev/antares/internal/config"
 	"github.com/enowdev/antares/internal/engagement"
@@ -358,6 +359,17 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		}
 		_ = emit(Event{Type: EventDone})
 	}()
+	// A structured, manifest-authorized target/scope brief may select the
+	// scoped Security toolset automatically. Other conversations retain their
+	// configured role and tools, and sub-agents never auto-start engagements.
+	if !req.Quiet && req.Depth == 0 && req.Role == "" && req.Toolset == "" {
+		if initial, _ := authorizedAutoEngagement(req.Message, strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))); initial.URL != "" {
+			req.Role = "security"
+		}
+	}
+	// The existing natural-language security mission recognizer handles
+	// authorized briefs that are not structured as Target:/Scope: lines.
+	autoSelectSecurityRole(&req)
 	cfg := a.config()
 
 	prep, err := a.prepareTurn(ctx, &req, emit)
@@ -372,6 +384,10 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 	toolSpecs := prep.toolSpecs
 	byName := prep.byName
 	systemPrompt := prep.systemPrompt
+	rapidSecurity := toolFirstMission(req, toolSpecs)
+	if rapidSecurity {
+		systemPrompt += securityToolFirstInstructions
+	}
 	maxTurns := prep.maxTurns
 	goal := prep.goal
 	hasGoal := prep.hasGoal
@@ -392,6 +408,17 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		emptyResponseCount int           // consecutive empty model responses, capped to prevent loops
 		failures           []toolFailure // errored tool calls, for post-turn learning
 	)
+	// A complete Target:/Scope: brief must produce a real, scoped network
+	// tool event before any model-generated narration. The scoped transport,
+	// BunnyGuard audit, rate budget and redirect checks remain in force.
+	kickoffHistory, kickoffCount, err := a.autoKickoff(runCtx, req, sess, byName, modelName, emit)
+	if err != nil {
+		return nil, err
+	}
+	history = append(history, kickoffHistory...)
+	toolCalls += kickoffCount
+	totalToolCalls += kickoffCount
+
 	repeats := newRepeatTracker(cfg.Agent.RepeatLimit)
 	todoOpenPrev := -1 // open task count at the last nudge, to detect no progress
 
@@ -420,8 +447,30 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 			ParallelToolCalls: cfg.Model.ParallelToolCall,
 			PromptCache:       cfg.PromptCaching.Enabled,
 		}
+		toolFirst := rapidSecurity && turn == 1
+		// Suppress the model's intermediate planning prose on EVERY turn
+		// where actual tools are requested. The user sees only real action
+		// notices and the final answer after the last tool finishes.
+		suppressToolNarration := rapidSecurity
+		var preamble []Event
+		modelEmit := emit
+		if suppressToolNarration {
+			// Buffer any model-generated narration. A genuine first tool call
+			// discards it; when a provider refuses tools, release the text
+			// rather than hiding an actionable blocker from the operator.
+			modelEmit = func(e Event) error {
+				if e.Type == EventText || e.Type == EventReasoning {
+					if len(preamble) < 256 { preamble = append(preamble, e) }
+					return nil
+				}
+				return emit(e)
+			}
+		}
+		if toolFirst {
+			llmReq.ToolChoice = firstSecurityToolChoice(true)
+		}
 
-		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, emit)
+		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)
 		if err == nil {
 			err = validateToolCallArguments(resp)
 		}
@@ -436,13 +485,29 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 			case <-runCtx.Done():
 			case <-time.After(time.Duration(att+1) * 800 * time.Millisecond):
 			}
-			resp, err = a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, emit)
+			preamble = nil
+			resp, err = a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)
 			if err == nil {
 				err = validateToolCallArguments(resp)
 			}
 		}
 		if err != nil {
 			return nil, err
+		}
+		if suppressToolNarration {
+			if len(resp.ToolCalls) > 0 {
+				// No introductory essay should appear in the UI or in the
+				// persisted assistant message preceding a real tool call.
+				resp.Content = ""
+				resp.Reasoning = ""
+			} else {
+				// The provider could not honor required tool selection.
+				// Never invent that a crawl/sign-in ran: surface the actual
+				// text and let normal finalization explain the blocker.
+				for _, e := range preamble {
+					if err := emit(e); err != nil { return nil, err }
+				}
+			}
 		}
 
 		total.InputTokens += resp.Usage.InputTokens

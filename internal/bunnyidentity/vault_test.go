@@ -54,7 +54,7 @@ func TestCannotOverwriteIdentity(t *testing.T){
 func TestBudgetAndRevoke(t *testing.T){
  v:=New();defer v.Close()
  for i:=0;i<MaxIdentities;i++{
-  if err:=v.Add(fmt.Sprintf("test_%d",i),fmt.Sprintf("%s%02d",first,i),fmt.Sprintf("resource_%d",1000+i),time.Minute);err!=nil{t.Fatal(err)}
+  if err:=v.Add(fmt.Sprintf("test_%d",i),fmt.Sprintf("%s_%02d",first,i),fmt.Sprintf("resource_%d",1000+i),time.Minute);err!=nil{t.Fatal(err)}
  }
  if err:=v.Add("extra",second,"resource_9999",time.Minute);err==nil{t.Fatal("quota bypassed")}
  v.Revoke("test_0")

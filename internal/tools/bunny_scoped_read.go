@@ -20,7 +20,10 @@ func (scopedReadTool) Description()string{
  "Requires ANTARES_BUNNY_GUARD_POLICY; only GET and HEAD are supported. "+
  "The response preview is optional and may contain sensitive/untrusted page data."
 }
-func (scopedReadTool) RequiresApproval()bool{return true}
+// A validated, preauthorized engagement manifest grants the read-only
+// GET/HEAD capability. Explicit approval remains required for any tool
+// with additional effects; this transport enforces origin/IP/redirect caps.
+func (scopedReadTool) RequiresApproval()bool{return false}
 func (scopedReadTool) UntrustedOutput()bool{return true}
 func (scopedReadTool) Schema()map[string]any{
  return schema(map[string]any{

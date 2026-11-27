@@ -40,7 +40,9 @@ func (a *Agent) buildSystemPrompt(ctx context.Context, req Request, sess *store.
 	b.WriteString("## Who you are\n\n")
 	b.WriteString(soul)
 	b.WriteString("\n")
-	if config.SoulIsUnset() && !isSubordinateRun(req) {
+	// A security user who submitted a target and authorized scope expects
+	// immediate tool use, never a first-run persona questionnaire.
+	if config.SoulIsUnset() && !isSubordinateRun(req) && !securityAssessmentRequest(req) {
 		b.WriteString(`
 You have not been given an identity yet. Before anything else this conversation,
 introduce yourself warmly and briefly — you have just "woken up" here and are

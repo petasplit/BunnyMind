@@ -167,17 +167,34 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
  if network&&d.Allowed{g.total++;g.last=time.Now()}
  return d
 }
-var initOnce sync.Once
-var active *Guard
-var initErr error
-// GateFromEnv is opt-in and fails closed on an invalid manifest. It does not
-// constrain plugin side effects, redirects, browsers or OS network activity.
+// Guard instances are cached per verified manifest path and content digest.
+// Never retain a global first-loaded policy after the operator switches
+// engagements. A reconfigured manifest must be validated before any call.
+var gateCacheMu sync.Mutex
+var gateCache=map[string]struct{
+ hash string
+ guard *Guard
+}{}
+// GateFromEnv is opt-in and fails closed if a configured policy is invalid.
+// It does not constrain plugin side effects, browsers or OS network activity.
 func GateFromEnv(session,tool,args string)Decision{
  p:=strings.TrimSpace(os.Getenv(EnvPolicy))
  if p==""{return Decision{Allowed:true,Reason:"guard not enabled"}}
- initOnce.Do(func(){active,initErr=New(p)})
- if initErr!=nil{return Decision{Reason:"invalid engagement policy: "+initErr.Error()}}
- return active.Evaluate(session,tool,args)
+ absolute,err:=filepath.Abs(p)
+ if err!=nil{return Decision{Reason:"cannot resolve engagement manifest"}}
+ b,err:=os.ReadFile(absolute)
+ if err!=nil{return Decision{Reason:"cannot read engagement manifest"}}
+ fingerprint:=digest(b)
+ gateCacheMu.Lock()
+ defer gateCacheMu.Unlock()
+ cached,ok:=gateCache[absolute]
+ if !ok||cached.hash!=fingerprint{
+  g,loadErr:=New(absolute)
+  if loadErr!=nil{return Decision{Reason:"invalid engagement policy: "+loadErr.Error()}}
+  cached=struct{hash string;guard *Guard}{fingerprint,g}
+  gateCache[absolute]=cached
+ }
+ return cached.guard.Evaluate(session,tool,args)
 }
 func VerifyAudit(path string)(int,error){g,err:=New(path);if err!=nil{return 0,err};return g.seq,nil}
 

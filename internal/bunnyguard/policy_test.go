@@ -58,3 +58,51 @@ func TestInvalidManifestRejected(t *testing.T){
  if err:=os.WriteFile(p,[]byte(`{"engagement_id":"x","allowed_origins":[],"max_network_calls":0}`),0600);err!=nil{t.Fatal(err)}
  if _,err:=New(p);err==nil{t.Fatal("invalid policy accepted")}
 }
+
+func TestGateFromEnvDoesNotReusePreviousEngagement(t *testing.T){
+ first:=filepath.Join(t.TempDir(),"first.json")
+ second:=filepath.Join(t.TempDir(),"second.json")
+ write:=func(path,engagement,origin string){
+  t.Helper()
+  data,err:=json.Marshal(Policy{
+   EngagementID:engagement,AllowedOrigins:[]string{origin},
+   AllowedMethods:[]string{"GET"},MaxNetworkCalls:3,
+  })
+  if err!=nil{t.Fatal(err)}
+  if err:=os.WriteFile(path,data,0600);err!=nil{t.Fatal(err)}
+ }
+ write(first,"engagement_1","http://127.0.0.1:4001")
+ write(second,"engagement_2","http://127.0.0.1:4002")
+ t.Setenv(EnvPolicy,first)
+ if !GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4001/"}`).Allowed{
+  t.Fatal("first policy should permit its exact origin")
+ }
+ t.Setenv(EnvPolicy,second)
+ if GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4001/"}`).Allowed{
+  t.Fatal("stale first policy was reused for second engagement")
+ }
+ if !GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4002/"}`).Allowed{
+  t.Fatal("second engagement was not loaded")
+ }
+}
+func TestGateFromEnvReloadsChangedAllowlist(t *testing.T){
+ path:=filepath.Join(t.TempDir(),"policy.json")
+ write:=func(origin string){
+  data,_:=json.Marshal(Policy{EngagementID:"same_lab",
+   AllowedOrigins:[]string{origin},AllowedMethods:[]string{"GET"},
+   MaxNetworkCalls:4})
+  if err:=os.WriteFile(path,data,0600);err!=nil{t.Fatal(err)}
+ }
+ write("http://127.0.0.1:4001")
+ t.Setenv(EnvPolicy,path)
+ if !GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4001/"}`).Allowed{
+  t.Fatal("initial approved read denied")
+ }
+ write("http://127.0.0.1:4002")
+ if GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4001/"}`).Allowed{
+  t.Fatal("manifest modification did not revoke old origin")
+ }
+ if !GateFromEnv("session","scoped_read",`{"url":"http://127.0.0.1:4002/"}`).Allowed{
+  t.Fatal("new approved origin not recognized")
+ }
+}
