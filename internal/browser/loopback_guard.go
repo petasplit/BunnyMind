@@ -52,7 +52,7 @@ func (s *Session) configureLoopbackGuard(ctx context.Context,c *conn)error{
   return errors.New("isolated fixture must launch its own clean browser without proxy, remote debugger, stealth or persistent profile")
  }
  gate:=&loopbackGate{origin:origin}
- c.setOnEvent(func(method string,params []byte,sessionID string){
+ c.setOnEvent(func(method string,params json.RawMessage,sessionID string){
   if method!="Fetch.requestPaused"{return}
   var paused struct{
    RequestID string `json:"requestId"`
