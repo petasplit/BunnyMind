@@ -4,8 +4,8 @@ import (
  "context"
  "crypto/tls"
  "errors"
- "fmt"
  "io"
+ "fmt"
  "net"
  "net/netip"
  "regexp"
@@ -129,7 +129,7 @@ func (m *IMAPOTP) check(ctx context.Context,actor string,checkpoint mailboxCheck
  start:=uint32(1)
  if box.Messages>20{start=box.Messages-19}
  seq:=new(imap.SeqSet);seq.AddRange(start,box.Messages)
-	section:=&imap.BodySectionName{BodyPartName:imap.BodyPartName{Specifier:imap.TextSpecifier}}
+	section:=&imap.BodySectionName{}
  items:=[]imap.FetchItem{imap.FetchEnvelope,imap.FetchUid,section.FetchItem()}
  messages:=make(chan *imap.Message,20)
 	done:=make(chan error,1)
@@ -140,9 +140,11 @@ func (m *IMAPOTP) check(ctx context.Context,actor string,checkpoint mailboxCheck
   if ctx.Err()!=nil{continue}
   body:=msg.GetBody(section)
   if body==nil{continue}
-  b,_:=io.ReadAll(io.LimitReader(body,4097))
-  if len(b)>4096{continue}
-  code,ok:=extractVerifiedCode(string(b),m.Settings[actor].Sender,checkpoint.recipient,msg,checkpoint.armedAt)
+  b,_:=io.ReadAll(io.LimitReader(body,maxMailBytes+1))
+  if len(b)>maxMailBytes{continue}
+  text,err:=readMailText(b)
+  if err!=nil{continue}
+  code,ok:=extractVerifiedCode(text,m.Settings[actor].Sender,checkpoint.recipient,msg,checkpoint.armedAt)
   if ok{candidates=append(candidates,code)}
  }
  if err:=<-done;err!=nil{return "",errors.New("IMAP message fetch failed")}
