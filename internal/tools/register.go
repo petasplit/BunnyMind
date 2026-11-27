@@ -30,6 +30,7 @@ func init() {
 		assessAuthzReceiptsTool{},
 		compareAuthzFixTool{},
 		compareBuildBoundFixTool{},
+		authWorkflowLabTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},

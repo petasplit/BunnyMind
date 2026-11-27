@@ -44,12 +44,15 @@ func TestOTPRetryBudget(t *testing.T){
  }
  email:="budget_user@example.test"
  if request("/register",`{"email":"budget_user@example.test"}`)!=202{t.Fatal("registration")}
- for i:=0;i<MaxAttempts;i++{
-  if request("/session/verify",`{"email":"budget_user@example.test","code":"xxxxxx"}`)!=400{t.Fatal("non-numeric OTP should fail format validation")}
-  if request("/session/verify",`{"email":"budget_user@example.test","code":"999999"}`)!=401{t.Fatal("wrong numeric OTP accepted")}
- }
  msg,_:=box.Last(email)
  code,_:=ExtractCode(msg,email)
+ wrong:="999999"
+ if wrong==code {wrong="888888"}
+ for i:=0;i<MaxAttempts;i++{
+  if request("/session/verify",`{"email":"budget_user@example.test","code":"xxxxxx"}`)!=400{t.Fatal("non-numeric OTP should fail format validation")}
+  body:=`{"email":"budget_user@example.test","code":"`+wrong+`"}`
+  if request("/session/verify",body)!=401{t.Fatal("incorrect numeric OTP accepted")}
+ }
  if request("/session/verify",`{"email":"budget_user@example.test","code":"`+code+`"}`)!=401{t.Fatal("retry limit not enforced")}
 }
 func TestNoExternalEmailAccepted(t *testing.T){
