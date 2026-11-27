@@ -16,7 +16,8 @@ respect each project's license.
 | [Strix](https://github.com/usestrix/strix) | Multi-agent graph with API contracts and run budgets | Browser+API, reports/patches, CI hooks | Actual performance depends on chosen model and target |
 | [Xalgorix](https://github.com/xalgorix/xalgorix) | Extended methodology and separate verifier | Recheck before marking a finding verified, local Ollama support | Numerous high-impact capabilities; no independently reproduced general-purpose benchmark verified here |
 | [depthfirst](https://depthfirst.com/agentic-pentesting) | Closed runtime security validation with code linkage | Replay after fix, static-to-dynamic evidence timelines | Hosted/closed, no transferable full harness |
-| [Cairn](https://github.com/Ed-Marcavage/awesome-security-agent-harnesses) | Blackboard-oriented distributed exploration (catalogue description) | Agent workers collaborate through facts and task hints | Need direct repository verification before choosing components |
+| [Cairn](https://github.com/kgreenhalgh/pentest-cairn) | Shared fact/intent/hint blackboard; workers explore an unknown state space | Decentralized OODA reasoning, parent-child task projects, adaptive intents | Competition results are author-reported; this architecture needs strong fact provenance and bounded worker cost |
+| [ChainReactors cyber-harness](https://github.com/chainreactors/cyber-harness) | Composable Go extension lifecycle | Models, tools, knowledge and collaboration share one extension contract | AGPL-3.0; conceptually reusable, but source reuse requires license analysis |
 | [BreachWeave](https://github.com/Ed-Marcavage/awesome-security-agent-harnesses) | Manager/Solver/Observer separation (catalogue description) | Observer holds termination decision independent of task solvers | Public competition claims do not establish success on ordinary web applications |
 
 ## What v0.4 adds
@@ -31,16 +32,36 @@ consume the queue. The evidence digest required to complete tasks is
 caller-supplied and does not attest real vulnerability proof. The v0.2 offline
 evidence reviewer likewise evaluates provided observations, not authenticity.
 
+
+## BunnyMind v0.5 and v0.6 additions
+
+**v0.5 — BunnyNet:** The opt-in guarded mode now uses a dedicated read-only
+HTTP transport that validates exact origins, dial-time IP addresses and
+optional narrow private CIDR exceptions. It blocks redirects and restricts
+responses to 64 KiB. This applies only to `scoped_read`, not to arbitrary
+browser, MCP, plugin or subprocess networking. Legacy HTTP tools are denied
+when the explicit guarded mode is active. It is not universal containment.
+
+**v0.6 — BunnyGraph:** A per-session versioned inventory graph now stores
+caller-supplied origins, endpoints, services, repositories and dependencies,
+with typed edges and source labels. Successive snapshots yield deterministic
+added/removed/changed sets. This is **not** live discovery or evidence
+attestation; graph fingerprints and provenance labels must come from trusted
+instrumentation before being treated as observations.
+
+Both additions have focused regression suites and are staged in draft PRs
+rather than merged to main.
+
 ## Gaps, ordered by real-world value
 
-1. Hard network-layer scope and egress restrictions, incl. DNS, redirects,
-   browser/CDP, WebSockets, subprocesses and authorized private labs.
+1. Extend v0.5 network checks from the restricted reader to all relevant
+   browser/CDP, WebSocket, tool/plugin, subprocess and proxy egress paths.
 2. Shared engagement identity for independent subagents, with reliable claims,
    lock coordination, and resume after process restarts.
 3. Independently observed and authenticated evidence receipts with trace links
    to the original request/response and negative controls; replay on fixed code.
-4. Graph of inventory assets and ownership relationships, incremental refresh,
-   coverage accounting and stale-result invalidation.
+4. Ingest v0.6 graph snapshots from trusted captures and source scans;
+   automate dependency-aware re-review of changed assets and stale-result invalidation.
 5. Documented authentication test personas and non-production test sessions.
 6. Bounded, resumable verifier/fix/review workflows with operator approvals,
    deterministic lab success gates, cost/time budgets and rollback.

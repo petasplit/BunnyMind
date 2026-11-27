@@ -24,6 +24,7 @@ func init() {
 		evidenceReviewTool{},
 		scopedReadTool{},
 		investigationBoardTool{},
+		inventoryGraphTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
