@@ -2,18 +2,31 @@ package tools
 
 import (
  "os"
+ "regexp"
  "strings"
 
  "github.com/enowdev/antares/internal/bunnybrowserflow"
  "github.com/enowdev/antares/internal/bunnyharness"
 )
 
+var safeAdaptiveTaskID=regexp.MustCompile(`^[a-z0-9_]{1,48}package tools
+
+import (
+ "os"
+ "regexp"
+ "strings"
+
+ "github.com/enowdev/antares/internal/bunnybrowserflow"
+ "github.com/enowdev/antares/internal/bunnyharness"
+)
+
+)
 func adaptiveReviewTasks(checks []bunnybrowserflow.NextCheck)[]bunnyharness.Task{
  tasks:=make([]bunnyharness.Task,0,len(checks))
  seen:=map[string]bool{}
  for _,check:=range checks{
   id:="auth_"+check.Category
-  if len(id)>48||seen[id]||check.Priority<1||check.Priority>5{continue}
+  if !safeAdaptiveTaskID.MatchString(id)||seen[id]||check.Priority<1||check.Priority>5{continue}
   seen[id]=true
   kind:="analysis"
   switch check.Category{
