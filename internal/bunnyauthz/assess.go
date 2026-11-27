@@ -62,6 +62,9 @@ func (p Plan) labPlan(actor,caseSuffix string)bunnylab.Plan{
  }
 }
 func Validate(p Plan)error{
+ // The owner/foreign test must address one canonical resource; query strings
+ // would risk mixing secrets or input parameters into the signed comparisons.
+ if strings.ContainsAny(p.ResourcePath,"?#"){return errors.New("authorization test resource path cannot contain query or fragment")}
  if err:=bunnylab.Validate(p.labPlan(OwnerActor,"owner"));err!=nil{return fmt.Errorf("owner plan: %w",err)}
  if err:=bunnylab.Validate(p.labPlan(ForeignActor,"foreign"));err!=nil{return fmt.Errorf("cross-user plan: %w",err)}
  return nil
