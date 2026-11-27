@@ -8,6 +8,7 @@ import (
  "sync"
 
  "github.com/enowdev/antares/internal/bunnygraph"
+ "github.com/enowdev/antares/internal/bunnyplanner"
  "github.com/enowdev/antares/internal/config"
 )
 
@@ -17,13 +18,14 @@ type inventoryGraphTool struct{}
 func (inventoryGraphTool) Name()string{return "inventory_graph"}
 func (inventoryGraphTool) Description()string{
  return "Record a bounded inventory snapshot and compare it to the last one "+
- "in this session. Outputs added/changed/removed asset IDs and graph edges. "+
+ "in this session. An update_and_suggest action also proposes bounded review tasks. "+
+ "Outputs added/changed/removed asset IDs and graph edges. "+
  "No network calls. Source labels and fingerprints are supplied by the caller, not verified."
 }
 func (inventoryGraphTool) RequiresApproval()bool{return false}
 func (inventoryGraphTool) Schema()map[string]any{
  return schema(map[string]any{
-  "action":propEnum("Inventory action.","update","status"),
+  "action":propEnum("Inventory action.","update","update_and_suggest","status"),
   "assets":map[string]any{
    "type":"array",
    "description":"For update: observed or inferred graph assets (do not include credentials, query strings or sensitive paths).",
@@ -72,6 +74,17 @@ func (inventoryGraphTool) Execute(_ context.Context,in Input)Result{
  switch args.Action{
  case "update":
   out,err=m.Update(in.SessionID,bunnygraph.Snapshot{Assets:args.Assets,Links:args.Links})
+ case "update_and_suggest":
+  var diff bunnygraph.Diff
+  diff,err=m.Update(in.SessionID,bunnygraph.Snapshot{Assets:args.Assets,Links:args.Links})
+  if err==nil{
+   var suggestions bunnyplanner.Plan
+   suggestions,err=bunnyplanner.Build(bunnyplanner.ChangeSet{
+    Added:diff.Added,Removed:diff.Removed,Changed:diff.Changed,
+    AddedLinks:diff.AddedLinks,RemovedLinks:diff.RemovedLinks,
+   },bunnyplanner.MaxSuggestions)
+   if err==nil{out=map[string]any{"diff":diff,"review_plan":suggestions}}
+  }
  case "status":
   out,err=m.Summary(in.SessionID)
  default:return Errorf("invalid inventory action %q",args.Action)
