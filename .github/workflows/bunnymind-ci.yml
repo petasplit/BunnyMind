@@ -21,3 +21,25 @@ jobs:
         run: go test ./internal/agent ./internal/config
       - name: Static analysis
         run: go vet ./internal/bunnyguard ./internal/bunnyevidence ./internal/bunnyharness ./internal/bunnynet ./internal/bunnygraph ./internal/tools ./internal/agent ./internal/config
+
+  harness-microbench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Bench board persistence and inventory graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./internal/bunnyharness ./internal/bunnygraph \
+            -run '^$' -bench '^Benchmark' -benchtime=25x -benchmem \
+            | tee bunny-harness-microbench.txt
+      - name: Archive reproducible harness measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: bunny-harness-microbench
+          path: bunny-harness-microbench.txt
+          retention-days: 30
