@@ -135,12 +135,13 @@ type TrustedMailboxSecrets struct{
  Mu sync.Mutex
  requested map[string]time.Time
  consumed map[string]uint32
+ usedRequest map[string]time.Time
 }
 func NewTrustedMailboxSecrets(c MailboxConfig,transport InboxTransport,other Secrets)(*TrustedMailboxSecrets,error){
  if err:=validateMailboxConfig(c);err!=nil{return nil,err}
  if transport==nil||other==nil{return nil,errors.New("trusted inbox and account credential provider required")}
  return &TrustedMailboxSecrets{Config:c,Transport:transport,Other:other,
-  requested:map[string]time.Time{},consumed:map[string]uint32{}},nil
+  requested:map[string]time.Time{},consumed:map[string]uint32{},usedRequest:map[string]time.Time{}},nil
 }
 func (s *TrustedMailboxSecrets) MarkCodeRequested(actor string){
  s.Mu.Lock();defer s.Mu.Unlock()
@@ -151,9 +152,11 @@ func (s *TrustedMailboxSecrets) Resolve(ctx context.Context,actor,key string)(st
  s.Mu.Lock()
  since,ok:=s.requested[actor]
  last:=s.consumed[actor]
+ alreadyUsed:=!since.IsZero()&&s.usedRequest[actor].Equal(since)
  box,exists:=s.Config.Boxes[actor]
  s.Mu.Unlock()
  if !ok||!exists{return "",errors.New("OTP request not recorded for this test identity")}
+ if alreadyUsed{return "",errors.New("verification request already consumed")}
  password,err:=s.Other.Resolve(ctx,actor,"imap_password")
  if err!=nil{return "",errors.New("dedicated inbox credential missing")}
  defer func(){password=""}()
@@ -172,6 +175,7 @@ func (s *TrustedMailboxSecrets) Resolve(ctx context.Context,actor,key string)(st
    s.Mu.Lock()
    if s.consumed[actor]>=selectedUID{s.Mu.Unlock();return "",errors.New("verification code already consumed")}
    s.consumed[actor]=selectedUID
+   s.usedRequest[actor]=since
    s.Mu.Unlock()
    return code,nil
   }
