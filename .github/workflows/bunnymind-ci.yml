@@ -65,5 +65,5 @@ jobs:
           BUNNY_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           go test ./internal/browser ./internal/bunnybrowserflow ./internal/bunnyegress ./cmd/bunny-approved-auth \
-            -run 'TestChromiumNetworkInterceptorBlocksOtherLocalPort|TestChromeLoopbackEmailAndSessionIsolation' \
+            -run 'TestChromiumNetworkInterceptorBlocksOtherLocalPort|TestChromeLoopbackEmailAndSessionIsolation|TestChromeDiscoversUnfamiliarAuthenticationForm' \
             -count=1 -timeout 210s -v
