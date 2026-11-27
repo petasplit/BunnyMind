@@ -61,11 +61,20 @@ func Validate(s Spec,policy bunnyguard.Policy)error{
  if s.MinIntervalMS<policy.MinIntervalMS||s.MinIntervalMS>5000{
   return errors.New("adaptive pacing violates the engagement")
  }
- seen:=map[string]bool{}
- for _,path:=range append(append([]string(nil),s.CandidatePaths...),s.NegativeControlPaths...){
-  if seen[path]{return errors.New("candidate and negative-control paths must be distinct")}
-  seen[path]=true
+ seenCandidates:=map[string]bool{}
+ for _,path:=range s.CandidatePaths{
+  if seenCandidates[path]{return errors.New("duplicate candidate path")}
+  seenCandidates[path]=true
  }
+ seenControls:=map[string]bool{}
+ for _,path:=range s.NegativeControlPaths{
+  if seenControls[path]{return errors.New("duplicate negative control path")}
+  seenControls[path]=true
+  if seenCandidates[path]&&s.CandidatePersona==s.ControlPersona{
+   return errors.New("a shared candidate/control path requires distinct test-account identities")
+  }
+ }
+
  p:=bunnyscript.Plan{EngagementID:s.EngagementID,RunID:s.CampaignID+"-r01",
   Origin:s.Origin,Marker:s.Marker,MinIntervalMS:s.MinIntervalMS,
   Cases:makeCases(s,0),
