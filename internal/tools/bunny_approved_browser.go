@@ -79,6 +79,14 @@ func (approvedBrowserAuthTool) Execute(ctx context.Context,in Input)Result{
  data,err:=json.MarshalIndent(result,"","  ")
  if err!=nil{return Errorf("browser result encoding failed")}
  out:=Text(string(data))
+ if adaptivePath!=""&&in.SessionID!=""&&len(result.NextChecks)>0{
+  seeded,e:=seedAdaptiveBoard(in.SessionID,result.NextChecks)
+  if e!=nil{
+   out.Meta=map[string]any{"review_board_warning":"adaptive auth succeeded, but follow-up review queue could not be created"}
+  }else if seeded{
+   out.Meta=map[string]any{"review_board_seeded":true}
+  }
+ }
  if in.SessionID!=""{
   digest:=sha256.Sum256(data)
   _,err=timelineStore().Append(in.SessionID,bunnytimeline.Entry{
@@ -86,7 +94,10 @@ func (approvedBrowserAuthTool) Execute(ctx context.Context,in Input)Result{
    AssetID:"approved_"+hex.EncodeToString(digest[:8]),
    EvidenceSHA256:hex.EncodeToString(digest[:]),
   })
-  if err!=nil{out.Meta=map[string]any{"timeline_warning":"browser run completed but metadata journal failed"}}
+  if err!=nil{
+   if out.Meta==nil{out.Meta=map[string]any{}}
+   out.Meta["timeline_warning"]="browser run completed but metadata journal failed"
+  }
  }
  return out
 }
