@@ -20,9 +20,10 @@ A request meeting these conditions automatically selects the security role
 when none was selected, appends concise execution rules, and sets the first
 model turn's `ToolChoice` to `required`.
 
-Any opening narration streamed by the model is buffered. If the model
-actually calls a tool, that opening text is discarded rather than shown or
-saved as an assistant preamble. If it fails to call any tool, the genuine
+Planning narration streamed during any tool-calling turn is buffered. If
+the model calls a tool, that intermediate text is discarded rather than
+shown or saved. Only a model response with no tool calls releases its
+final report or an actionable blocker. If it fails to call any tool, the genuine
 provider response is surfaced rather than falsely claiming an action ran.
 
 ## Real-time action updates

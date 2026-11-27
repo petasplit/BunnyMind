@@ -448,9 +448,13 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 			PromptCache:       cfg.PromptCaching.Enabled,
 		}
 		toolFirst := rapidSecurity && turn == 1
+		// Suppress the model's intermediate planning prose on EVERY turn
+		// where actual tools are requested. The user sees only real action
+		// notices and the final answer after the last tool finishes.
+		suppressToolNarration := rapidSecurity
 		var preamble []Event
 		modelEmit := emit
-		if toolFirst {
+		if suppressToolNarration {
 			// Buffer any model-generated narration. A genuine first tool call
 			// discards it; when a provider refuses tools, release the text
 			// rather than hiding an actionable blocker from the operator.
@@ -461,7 +465,9 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 				}
 				return emit(e)
 			}
-			llmReq.ToolChoice = firstSecurityToolChoice(toolFirst)
+		}
+		if toolFirst {
+			llmReq.ToolChoice = firstSecurityToolChoice(true)
 		}
 
 		resp, err := a.callModel(runCtx, client, llmReq, cfg.Streaming.Enabled, modelEmit)
@@ -488,7 +494,7 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		if err != nil {
 			return nil, err
 		}
-		if toolFirst {
+		if suppressToolNarration {
 			if len(resp.ToolCalls) > 0 {
 				// No introductory essay should appear in the UI or in the
 				// persisted assistant message preceding a real tool call.
