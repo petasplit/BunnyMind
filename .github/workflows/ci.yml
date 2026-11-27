@@ -95,12 +95,24 @@ jobs:
         id: setup-chrome
         with:
           chrome-version: stable
+      # Vite/TypeScript is intentionally invoked through Node rather than
+      # `bun run build` here. Bun 1.3.14 sporadically SIGSEGV'd after
+      # Vite emitted its dist files in the smoke job, even when web CI
+      # and focused Windows builds succeeded. Keep the same frontend bundle
+      # and browser smoke rather than skipping or muting the failing check.
+      - name: Build dashboard for browser smoke with Node
+        working-directory: web
+        run: |
+          node ./node_modules/typescript/bin/tsc -b
+          node ./node_modules/vite/bin/vite.js build
+      - name: Embed dashboard and compile real smoke binaries
+        run: |
+          rm -rf internal/server/dist
+          mkdir -p internal/server/dist
+          cp -r web/dist/. internal/server/dist/
+          touch internal/server/dist/.gitkeep
+          make build-api build-fixture
       - name: Smoke
         env:
           CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
-        # `make smoke` builds both bin/antares and bin/smokefixture (the
-        # shipped release binary is built by plain `make build` and never
-        # bundles the fixture) then runs scripts/smoke-run.mjs, which owns
-        # port pick, isolated ANTARES_HOME, provider stub, readiness, and
-        # cleanup.
-        run: make smoke
+        run: bun scripts/smoke-run.mjs

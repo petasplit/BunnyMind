@@ -43,7 +43,8 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authz-demo-windows-x64.exe ./cmd/bunnyauthz-demo
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-fix-demo-windows-x64.exe ./cmd/bunnyfix-demo
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authflow-demo-windows-x64.exe ./cmd/bunny-authflow-demo
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -52,6 +53,7 @@ jobs:
             dist/BunnyMind-windows-x64.exe
             dist/BunnyMind-authz-demo-windows-x64.exe
             dist/BunnyMind-fix-demo-windows-x64.exe
+            dist/BunnyMind-authflow-demo-windows-x64.exe
             dist/SHA256SUMS.txt
           retention-days: 7
 
@@ -121,4 +123,28 @@ jobs:
               throw "Build-bound fix comparison did not enforce distinct signed artifacts for $($case.Mode)"
             }
             Write-Host "PASS: signed synthetic build-bound comparison $($case.Mode)"
+          }
+          $authExe = Join-Path $PWD 'dist/BunnyMind-authflow-demo-windows-x64.exe'
+          if (-not (Test-Path $authExe)) { throw 'Windows authenticated workflow demo missing' }
+          foreach ($mode in @('secure','weak')) {
+            $arguments = @()
+            if ($mode -eq 'weak') { $arguments = @('-weak') }
+            $raw = & $authExe @arguments
+            if ($LASTEXITCODE -ne 0) { throw "Synthetic signup/OTP demo failed: $mode" }
+            $result = ($raw -join "`n") | ConvertFrom-Json
+            $expected = 'cross_user_denied_in_synthetic_lab'
+            if ($mode -eq 'weak') { $expected = 'cross_user_access_observed_in_synthetic_lab' }
+            if ($result.outcome -ne $expected -or
+                $result.accounts_created -ne 2 -or
+                $result.mail_messages_read -ne 3 -or
+                $result.otp_codes_submitted -ne 3 -or
+                -not $result.otp_replay_denied -or
+                -not $result.distinct_sessions -or
+                -not $result.rotation_invalidated_old -or
+                -not $result.logout_invalidated -or
+                -not $result.anonymous_denied -or
+                $result.request_count -gt 28) {
+              throw "Synthetic signup/OTP/session test assertion failed: $mode"
+            }
+            Write-Host "PASS: native Windows synthetic signup, email OTP, session isolation $mode"
           }
