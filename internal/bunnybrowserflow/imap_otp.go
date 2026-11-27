@@ -45,7 +45,7 @@ func NewIMAPOTP(settings map[string]MailboxSettings,credentials Secrets)(*IMAPOT
  }
  for actor,c:=range settings{
   if !validActor.MatchString(actor)||!mailboxHostname.MatchString(c.Host)||
-   strings.Contains(c.Host,"..")||!mailAddress.MatchString(c.Sender)||
+   strings.Contains(c.Host,"..")||!strings.Contains(c.Host,".")||!mailAddress.MatchString(c.Sender)||
    net.ParseIP(c.Host)!=nil{
    return nil,errors.New("invalid explicitly approved IMAP mailbox host or sender")
   }
