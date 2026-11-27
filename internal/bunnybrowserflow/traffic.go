@@ -50,7 +50,7 @@ func redactTraffic(actor string,step int,requests []browser.NetworkRequest,allow
    status=r.Response.Status
    outcome="responded"
   }else if r.Failed!=""{outcome="failed"}
-  digest:=sha256.Sum256([]byte(actor+"\n"+method+"\n"+origin+"\n"+hex.EncodeToString(fingerprint[:])+"\n"+outcome))
+  digest:=sha256.Sum256([]byte(actor+"\n"+method+"\n"+origin+"\n"+hex.EncodeToString(fingerprint[:])+"\n"+strconv.Itoa(step)+"\n"+strconv.Itoa(status)+"\n"+outcome))
   out=append(out,TrafficReceipt{
    Actor:actor,Step:step,Method:method,Origin:origin,
    PathSHA256:hex.EncodeToString(fingerprint[:]),
