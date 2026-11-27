@@ -16,6 +16,7 @@ import (
  "time"
 
  "github.com/enowdev/antares/internal/bunnyartifact"
+ "github.com/enowdev/antares/internal/bunnyaudit"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnyquota"
@@ -227,5 +228,9 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  if err:=os.WriteFile(filepath.Join(dir,"report.md"),[]byte(markdown.String()),0600);err!=nil{return EvidenceSummary{},err}
  note:=[]byte("BunnyMind Python proof capture\n\nscenario.py: exact generated Python source\nplan.json: selected approved tests\nvalidation.json: redacted observations and SHA-256 digests\ntranscript.enc: AES-256-GCM full captured request and response bytes, up to 64 KiB response body per sample\n\nThis evidence is not independently verified to prove a vulnerability. Decrypt only in an authorized triage environment.\n")
  if err:=os.WriteFile(filepath.Join(dir,"README.txt"),note,0600);err!=nil{return EvidenceSummary{},err}
+ // Bind the script, plan, reports, and encrypted transcript to an authenticated seal.
+ if _,err:=bunnyaudit.SealRun(dir,runner.EncryptionKey);err!=nil{
+  return EvidenceSummary{},fmt.Errorf("evidence integrity sealing failed: %w",err)
+ }
  return summary,nil
 }
