@@ -80,10 +80,13 @@ func Analyze(r io.Reader, allowedOrigins []string) (Summary,error) {
 	}
 	allow:=map[string]bool{}
 	for _,s:=range allowedOrigins{
-		u,origin,ok:=originAllowed(s,map[string]bool{strings.ToLower(s):true})
-		if !ok||u==nil||u.Path!=""&&u.Path!="/"||u.RawQuery!=""||
-		   u.User!=nil||u.Fragment!=""{return Summary{},errors.New("invalid allowed origin")}
-		allow[origin]=true
+		u,err:=url.Parse(s)
+		if err!=nil||u==nil||(u.Scheme!="https"&&u.Scheme!="http")||
+		   u.Hostname()==""||u.User!=nil||u.Opaque!=""||
+		   (u.Path!=""&&u.Path!="/")||u.RawQuery!=""||u.Fragment!="" {
+			return Summary{},errors.New("invalid allowed origin")
+		}
+		allow[strings.ToLower(u.Scheme+"://"+u.Host)]=true
 	}
 	raw,err:=io.ReadAll(io.LimitReader(r,MaxFileBytes+1))
 	if err!=nil{return Summary{},err}
