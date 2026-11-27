@@ -143,6 +143,11 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    }else{state,err=discovered.DiscoverAuth(ctx)}
    if err!=nil{return Result{},errors.New("auth form discovery failed")}
    if err:=validateDiscovery(state);err!=nil{return Result{},err}
+   if capture,ok:=b.(EvidenceScreenshotter);ok&&len(result.Screenshots)<64{
+    shot,e:=capture.RecordScreenshot(ctx,actor,stateScreenshotStage(state))
+    if e!=nil{return Result{},errors.New("encrypted authentication screenshot could not be saved")}
+    if shot.File!=""{result.Screenshots=append(result.Screenshots,shot)}
+   }
    if state.Ambiguous{return Result{},fmt.Errorf("ambiguous authentication actions for %s; operator review required",actor)}
    if cfg.PasskeyMode!=""&&cfg.PasskeyMode!="off"&&state.PasskeySelector!=""{
     before,_:=b.CurrentURL(ctx)
@@ -257,6 +262,11 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    }
    beforeURL,_:=b.CurrentURL(ctx)
    if err:=b.Click(ctx,state.SubmitSelector);err!=nil{return Result{},errors.New("approved form submission failed")}
+   if capture,ok:=b.(EvidenceScreenshotter);ok&&len(result.Screenshots)<64{
+    shot,e:=capture.RecordScreenshot(ctx,actor,"after_submit")
+    if e!=nil{return Result{},errors.New("encrypted submission screenshot could not be saved")}
+    if shot.File!=""{result.Screenshots=append(result.Screenshots,shot)}
+   }
    current,err:=b.CurrentURL(ctx)
    if err!=nil||!approvedBrowserURL(current,allow){return Result{},errors.New("form navigation left approved scope")}
    seq:=len(result.Events)+1
