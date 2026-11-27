@@ -104,16 +104,27 @@ func LoadApprovedConfiguration(scopePath,planPath,guardPath string)(ApprovedScop
  origin,err:=strictOrigin(plan.Origin)
  if err!=nil||!allow[origin]{return ApprovedScope{},Plan{},errors.New("plan origin not authorized")}
  if err:=validateSteps(plan);err!=nil{return ApprovedScope{},Plan{},err}
+ if err:=actorBudget(plan,scope,g.Manifest());err!=nil{return ApprovedScope{},Plan{},err}
  return scope,plan,nil
 }
 // RunApproved reuses the bounded workflow executor but accepts explicitly
 // approved external HTTPS origins. The injected factory must itself enforce
 // a DNS-pinned proxy and a request-stage browser gate.
+
+func actorBudget(plan Plan,scope ApprovedScope,manifest bunnyguard.Policy)error{
+ actors:=map[string]bool{}
+ for _,step:=range plan.Steps{actors[step.Actor]=true}
+ if len(actors)==0||scope.MaxBrowserRequests*len(actors)>manifest.MaxNetworkCalls{
+  return errors.New("aggregate browser identity budget exceeds engagement request budget")
+ }
+ return nil
+}
 func RunApproved(ctx context.Context,p Plan,scope ApprovedScope,factory Factory,secrets Secrets,handoff Handoff,manifest bunnyguard.Policy)(Result,error){
  allow,err:=ValidateApprovedScope(scope,manifest)
  if err!=nil{return Result{},err}
  origin,err:=strictOrigin(p.Origin)
  if err!=nil||!allow[origin]{return Result{},errors.New("workflow origin is not approved")}
  if err:=validateSteps(p);err!=nil{return Result{},err}
+ if err:=actorBudget(p,scope,manifest);err!=nil{return Result{},err}
  return runTrusted(ctx,p,factory,secrets,handoff,origin,allow)
 }
