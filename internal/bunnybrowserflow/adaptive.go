@@ -283,7 +283,8 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
    result.Events=append(result.Events,Event{Seq:seq,Actor:actor,Action:"discovered_form_submit",
     Outcome:"observed",EvidenceSHA256:adaptiveDigest(actor,signature,seq)})
    if recorder,ok:=b.(TrafficObserver);ok&&len(result.Traffic)<MaxTrafficReceipts{
-    receipts:=recorder.CaptureTraffic(ctx,actor,seq,allow)
+    receipts,e:=recorder.CaptureTraffic(ctx,actor,seq,allow)
+    if e!=nil{return Result{},errors.New("encrypted browser HTTP evidence capture failed")}
     remaining:=MaxTrafficReceipts-len(result.Traffic)
     if len(receipts)>remaining{receipts=receipts[:remaining]}
     result.Traffic=append(result.Traffic,receipts...)
