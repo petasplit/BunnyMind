@@ -19,6 +19,11 @@ type AdaptiveConfig struct {
  Actors []string `json:"actors"`
  SuccessText string `json:"success_text"`
  UseEmailOTP bool `json:"use_email_otp"`
+ UseTOTP bool `json:"use_totp,omitempty"`
+ UseMagicLink bool `json:"use_magic_link,omitempty"`
+ MagicLinkPrefixes []string `json:"magic_link_prefixes,omitempty"`
+ IdPOrigins []string `json:"idp_origins,omitempty"`
+ CaptchaTestMode bool `json:"captcha_test_mode,omitempty"`
  Mailboxes map[string]MailboxSettings `json:"mailboxes,omitempty"`
 }
 type OTPProvider interface {
@@ -44,11 +49,31 @@ func ValidateAdaptive(cfg AdaptiveConfig,scope ApprovedScope,manifest bunnyguard
   return errors.New("aggregate adaptive browser request budget exceeds permission")
  }
  if len(scope.ApprovedPostPaths)==0{return errors.New("adaptive auth requires explicitly approved POST paths")}
- if cfg.UseEmailOTP {
-  if len(cfg.Mailboxes)!=len(cfg.Actors){return errors.New("each OTP persona requires its own configured mailbox")}
+ factors:=0
+ if cfg.UseEmailOTP{factors++}
+ if cfg.UseTOTP{factors++}
+ if cfg.UseMagicLink{factors++}
+ if factors>1{return errors.New("select one trusted factor type per adaptive workflow")}
+ if cfg.UseEmailOTP||cfg.UseMagicLink{
+  if len(cfg.Mailboxes)!=len(cfg.Actors){return errors.New("each verification persona requires its own configured mailbox")}
   for _,actor:=range cfg.Actors{if _,ok:=cfg.Mailboxes[actor];!ok{return errors.New("missing approved actor mailbox")}}
   if _,err:=NewIMAPOTP(cfg.Mailboxes,KeyringSecrets{});err!=nil{return err}
- }else if len(cfg.Mailboxes)!=0{return errors.New("mailboxes supplied while email OTP mode is disabled")}
+ }else if len(cfg.Mailboxes)!=0{return errors.New("mailboxes supplied without email verification")}
+ if cfg.UseMagicLink{
+  if len(cfg.MagicLinkPrefixes)==0||len(cfg.MagicLinkPrefixes)>12{return errors.New("magic link endpoint allowlist is required")}
+  for _,prefix:=range cfg.MagicLinkPrefixes{
+   if !safePath(prefix){return errors.New("invalid operator-approved magic link path prefix")}
+  }
+ }else if len(cfg.MagicLinkPrefixes)!=0{return errors.New("unexpected magic link path allowlist")}
+ if len(cfg.IdPOrigins)>8{return errors.New("too many approved identity-provider origins")}
+ seenIDP:=map[string]bool{}
+ for _,raw:=range cfg.IdPOrigins{
+  idp,err:=strictOrigin(raw)
+  if err!=nil||!allowed[idp]||idp==origin||seenIDP[idp]{
+   return errors.New("identity provider must be a distinct explicitly approved HTTPS origin")
+  }
+  seenIDP[idp]=true
+ }
  return nil
 }
 func fieldForRole(fields []DiscoveredField,role string)string{
