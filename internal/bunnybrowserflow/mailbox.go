@@ -7,7 +7,6 @@ import (
  "fmt"
  "io"
  "net"
- "net/netip"
  "regexp"
  "strings"
  "sync"
@@ -148,7 +147,19 @@ func (s *TrustedMailboxSecrets) MarkCodeRequested(actor string){
  if _,ok:=s.Config.Boxes[actor];ok{s.requested[actor]=time.Now().UTC()}
 }
 func (s *TrustedMailboxSecrets) Resolve(ctx context.Context,actor,key string)(string,error){
- if key!="otp"{return s.Other.Resolve(ctx,actor,key)}
+ if key!="otp"{
+  value,err:=s.Other.Resolve(ctx,actor,key)
+  if err!=nil{return "",err}
+  // Mailbox-linked registration must use the address of this exact
+  // test identity, not an unrelated recipient (prevents account mixing).
+  if key=="email" {
+   box,ok:=s.Config.Boxes[actor]
+   if !ok||!strings.EqualFold(value,box.Address){
+    return "",errors.New("test-account email is not bound to its approved mailbox")
+   }
+  }
+  return value,nil
+ }
  s.Mu.Lock()
  since,ok:=s.requested[actor]
  last:=s.consumed[actor]
