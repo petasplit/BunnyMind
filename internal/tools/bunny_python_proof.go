@@ -5,7 +5,6 @@ import (
  "crypto/sha256"
  "encoding/hex"
  "encoding/json"
- "errors"
  "os"
  "strings"
 
@@ -60,7 +59,7 @@ func (pythonProofRunTool) Execute(ctx context.Context,in Input)Result{
  if in.SessionID!=""{
   digest:=sha256.Sum256(output)
   _,err=timelineStore().Append(in.SessionID,bunnytimeline.Entry{
-   Lane:"evidence",Action:"validate",State:"succeeded",Source:bunnytimeline.SourceTool,
+   Lane:"evidence",Action:"verify",State:"succeeded",Source:bunnytimeline.SourceTool,
    AssetID:"pyproof_"+hex.EncodeToString(digest[:8]),EvidenceSHA256:hex.EncodeToString(digest[:]),
   })
   if err!=nil{
@@ -69,4 +68,3 @@ func (pythonProofRunTool) Execute(ctx context.Context,in Input)Result{
  }
  return result
 }
-var _=errors.New
