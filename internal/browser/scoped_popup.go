@@ -4,6 +4,7 @@ import (
  "context"
  "encoding/json"
  "errors"
+ "net"
  "net/url"
  "strings"
  "time"
@@ -19,9 +20,17 @@ type popupSession struct{
 func popupInScope(raw string,allowed map[string]bool)bool{
  if raw=="about:blank"||raw==""{return true}
  u,err:=url.Parse(raw)
- if err!=nil||u==nil||u.User!=nil||u.Opaque!=""||u.Scheme!="https"||
-  u.Hostname()==""||(u.Port()!=""&&u.Port()!="443"){return false}
- return allowed["https://"+strings.ToLower(u.Hostname())]
+ if err!=nil||u==nil||u.User!=nil||u.Opaque!=""||u.Hostname()==""{return false}
+ if u.Scheme=="https"{
+  if u.Port()!=""&&u.Port()!="443"{return false}
+  return allowed["https://"+strings.ToLower(u.Hostname())]
+ }
+ if u.Scheme=="http"{
+  ip:=net.ParseIP(u.Hostname())
+  if ip==nil||!ip.IsLoopback(){return false}
+  return allowed["http://"+u.Host]
+ }
+ return false
 }
 // acceptPopup is called from an independent CDP event handler. Popups remain
 // frozen until their Fetch request gate is installed, avoiding unfiltered
@@ -82,13 +91,20 @@ func (s *Session) removePopup(sessionID string){
 // allowlisted popup created by the current browser. Its origin must be
 // authorized before switching. No raw popup URL is returned.
 func (s *Session) SwitchToApprovedPopup(ctx context.Context)(bool,error){
- if len(s.opts.ExternalOrigins)==0{return false,errors.New("popup switching requires external approved browser scope")}
+ if len(s.opts.ExternalOrigins)==0&&s.opts.LoopbackOrigin==""{
+  return false,errors.New("popup switching requires a scoped browser")
+ }
  if err:=s.Start(ctx);err!=nil{return false,err}
  allowed:=map[string]bool{}
  for _,origin:=range s.opts.ExternalOrigins{
   o,err:=canonicalHTTPSOrigin(origin)
   if err!=nil{return false,err}
   allowed[o]=true
+ }
+ if s.opts.LoopbackOrigin!=""{
+  origin,err:=parseLoopbackOrigin(s.opts.LoopbackOrigin)
+  if err!=nil{return false,err}
+  allowed[origin]=true
  }
  deadline:=time.NewTimer(6*time.Second)
  defer deadline.Stop()
@@ -110,7 +126,7 @@ func (s *Session) SwitchToApprovedPopup(ctx context.Context)(bool,error){
      Result struct{Value string `json:"value"`} `json:"result"`
     }
     if json.Unmarshal(probe,&reply)==nil&&popupInScope(reply.Result.Value,allowed){
-     if strings.HasPrefix(reply.Result.Value,"https://"){
+     if strings.HasPrefix(reply.Result.Value,"https://")||strings.HasPrefix(reply.Result.Value,"http://"){
       s.mu.Lock()
       s.pageSess=candidate.sessionID
       s.mu.Unlock()
