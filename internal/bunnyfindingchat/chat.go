@@ -17,7 +17,7 @@ import (
  "github.com/enowdev/antares/internal/findings"
 )
 var safeFinding=regexp.MustCompile(`^F-[0-9]{3,6}$`)
-var unsafeInput=regexp.MustCompile(`(?i)(bearers+S+|passwords*[:=]|tokens*[:=]|secrets*[:=]|cookies*[:=])`)
+var unsafeInput=regexp.MustCompile(`(?i)(bearer[[:space:]]+[^[:space:]]+|password[[:space:]]*[:=]|token[[:space:]]*[:=]|secret[[:space:]]*[:=]|cookie[[:space:]]*[:=])`)
 type Turn struct {
  Role string `json:"role"`
  Text string `json:"text"`
