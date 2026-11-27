@@ -38,7 +38,9 @@ func (d *chromeDriver) Fill(ctx context.Context,selector,value string)error{
  // Keep credential bytes out of injected JavaScript source: only the
  // operator-locked selector goes into JS, followed by a CDP text event.
  script:=fmt.Sprintf(`(() => {
-  const el=document.querySelector(%s);
+  const selector=%s;
+  const m=/^\\[data-bm-auth="([^"]+)"\\]$/.exec(selector);
+  const el=(m && window.__bmAuthRefs && window.__bmAuthRefs[m[1]]) || document.querySelector(selector);
   if(!el || el.disabled || (el.tagName!=='INPUT'&&el.tagName!=='TEXTAREA')) return 'missing';
   el.focus();
   const proto=el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
@@ -55,7 +57,9 @@ func (d *chromeDriver) Fill(ctx context.Context,selector,value string)error{
 func (d *chromeDriver) Click(ctx context.Context,selector string)error{
  if !(validSelector.MatchString(selector)||safeDiscoverySelector.MatchString(selector)){return errors.New("invalid trusted selector")}
  script:=fmt.Sprintf(`(() => {
-  const el=document.querySelector(%s);
+  const selector=%s;
+  const m=/^\\[data-bm-auth="([^"]+)"\\]$/.exec(selector);
+  const el=(m && window.__bmAuthRefs && window.__bmAuthRefs[m[1]]) || document.querySelector(selector);
   if(!el || el.disabled) return 'missing';
   el.click();
   return 'ok';
