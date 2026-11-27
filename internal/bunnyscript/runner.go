@@ -185,6 +185,16 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  report,err:=json.MarshalIndent(summary,"","  ")
  if err!=nil{return EvidenceSummary{},err}
  if err:=os.WriteFile(filepath.Join(dir,"validation.json"),report,0600);err!=nil{return EvidenceSummary{},err}
+ var markdown strings.Builder
+ fmt.Fprintf(&markdown,"# BunnyMind captured Python proof: %s\n\n",p.RunID)
+ fmt.Fprintf(&markdown,"**Engagement:** %s  \n**Result:** %s  \n**Script:** scenario.py (SHA-256 %s)  \n**Evidence:** %s (SHA-256 %s)\n\n",p.EngagementID,summary.Outcome,summary.ScriptSHA256,summary.RawEvidenceFile,summary.RawEvidenceSHA256)
+ markdown.WriteString("## Captured cases\n\n| Sample | Kind | HTTP status | Marker in observed body | Truncated | Request SHA-256 | Response SHA-256 |\n|---|---|---:|---|---|---|---|\n")
+ for _,r:=range summary.Receipts{
+  fmt.Fprintf(&markdown,"| %s | %s | %d | %t | %t | %s | %s |\n",
+   r.SampleID,r.Kind,r.Status,r.MarkerPresent,r.Truncated,r.RequestSHA256,r.ResponseSHA256)
+ }
+ markdown.WriteString("\n## Captured evidence and verification\n\nThe full, private HTTP request/response observations are encrypted in the referenced vault artifact. Repeated candidate markers with negative controls are an auditable signal but **not independently confirmed security impact**. Response bodies are capped at 64 KiB; a truncated observation cannot satisfy the consistency check.\n\nFor confidential triage, explicitly decrypt the vault locally using the operator's OS-keyring key. Avoid attaching raw private data in public issues or untrusted channels.\n")
+ if err:=os.WriteFile(filepath.Join(dir,"report.md"),[]byte(markdown.String()),0600);err!=nil{return EvidenceSummary{},err}
  note:=[]byte("BunnyMind Python proof capture\n\nscenario.py: exact generated Python source\nplan.json: selected approved tests\nvalidation.json: redacted observations and SHA-256 digests\ntranscript.enc: AES-256-GCM full captured request and response bytes, up to 64 KiB response body per sample\n\nThis evidence is not independently verified to prove a vulnerability. Decrypt only in an authorized triage environment.\n")
  if err:=os.WriteFile(filepath.Join(dir,"README.txt"),note,0600);err!=nil{return EvidenceSummary{},err}
  return summary,nil
