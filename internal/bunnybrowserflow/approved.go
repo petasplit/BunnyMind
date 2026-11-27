@@ -90,6 +90,17 @@ func loadJSON(path string,v any)error{
  if err:=dec.Decode(&extra);err!=io.EOF{return errors.New("configuration must contain one JSON object")}
  return nil
 }
+// LoadApprovedScope validates an operator-owned external-target policy without
+// requiring a fixed workflow; adaptive mode may discover form structures.
+func LoadApprovedScope(scopePath,guardPath string)(ApprovedScope,error){
+ if strings.TrimSpace(guardPath)==""{return ApprovedScope{},errors.New("BunnyGuard policy required")}
+ guard,err:=bunnyguard.New(guardPath)
+ if err!=nil{return ApprovedScope{},errors.New("BunnyGuard policy invalid")}
+ var scope ApprovedScope
+ if err:=loadJSON(scopePath,&scope);err!=nil{return ApprovedScope{},err}
+ if _,err:=ValidateApprovedScope(scope,guard.Manifest());err!=nil{return ApprovedScope{},err}
+ return scope,nil
+}
 // LoadApprovedConfiguration loads a trusted local scope and JSON workflow;
 // no model-provided URL or secret is accepted.
 func LoadApprovedConfiguration(scopePath,planPath,guardPath string)(ApprovedScope,Plan,error){
