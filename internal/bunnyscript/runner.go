@@ -18,6 +18,7 @@ import (
  "github.com/enowdev/antares/internal/bunnyartifact"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyquota"
 )
 
 //go:embed runner.py
@@ -31,6 +32,12 @@ type Runner struct{
  Root string
  EncryptionKey []byte
  Secrets Secrets
+ // BudgetReserved is set only by the parent adaptive campaign after it
+ // has atomically reserved the entire maximum network budget.
+ BudgetReserved bool
+ // ExecutionLeaseHeld indicates the trusted parent campaign owns the
+ // cross-process engagement lease for this entire Python script run.
+ ExecutionLeaseHeld bool
 }
 type observation struct {
  SampleID string `json:"sample_id"`
@@ -42,6 +49,7 @@ type observation struct {
  MarkerPresent bool `json:"marker_present"`
  Truncated bool `json:"truncated"`
  ObservedAt string `json:"observed_at"`
+ ContentSHA256 string `json:"content_sha256"`
  RequestB64 string `json:"request_b64"`
  ResponseB64 string `json:"response_b64"`
 }
@@ -91,17 +99,29 @@ func validateTrace(raw []byte,p Plan)(EvidenceSummary,error){
   cut:=bytes.Index(rs,[]byte("\r\n\r\n"))
   if cut<0{return EvidenceSummary{},errors.New("response capture lacks HTTP header boundary")}
   body:=rs[cut+4:]
+  if SHA(body)!=o.ContentSHA256{
+   return EvidenceSummary{},errors.New("recorded HTTP body hash differs from captured bytes")
+  }
+  lineEnd:=bytes.Index(rs,[]byte("\r\n"))
+  if lineEnd<0||!bytes.HasPrefix(rs[:lineEnd],[]byte("HTTP/1.1 "+strconv.Itoa(o.Status)+" ")){
+   return EvidenceSummary{},errors.New("reported HTTP status differs from captured response line")
+  }
+  if _,e:=time.Parse(time.RFC3339,o.ObservedAt);e!=nil{
+   return EvidenceSummary{},errors.New("observation timestamp is invalid")
+  }
   if bytes.Contains(body,[]byte(p.Marker))!=o.MarkerPresent{
    return EvidenceSummary{},errors.New("reported proof marker is not present in captured response")
   }
   if o.Status<100||o.Status>599{return EvidenceSummary{},errors.New("invalid HTTP response status")}
+  markerInRequest:=bytes.Contains(rq,[]byte(p.Marker))
   receipt:=SampleReceipt{SampleID:o.SampleID,Kind:o.Kind,Persona:o.Persona,Status:o.Status,
    RequestSHA256:o.RequestSHA256,ResponseSHA256:o.ResponseSHA256,
-   MarkerPresent:o.MarkerPresent,Truncated:o.Truncated,ObservedAt:o.ObservedAt}
+   MarkerPresent:o.MarkerPresent,MarkerInRequest:markerInRequest,
+   Truncated:o.Truncated,ObservedAt:o.ObservedAt}
   summary.Receipts=append(summary.Receipts,receipt)
   if o.Kind=="candidate"{
    summary.Candidates++
-   if o.MarkerPresent&&o.Status>=200&&o.Status<300&&!o.Truncated{summary.ConsistentCandidates++}
+   if o.MarkerPresent&&!markerInRequest&&o.Status>=200&&o.Status<300&&!o.Truncated{summary.ConsistentCandidates++}
   }else{
    summary.Controls++
    if !o.MarkerPresent&&o.Status>=200&&o.Status<500&&!o.Truncated{summary.ConsistentControls++}
@@ -119,6 +139,16 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  root:=runner.Root
  if root==""{return EvidenceSummary{},errors.New("explicit evidence destination required")}
  if len(root)>2048{return EvidenceSummary{},errors.New("evidence path too long")}
+ if !runner.ExecutionLeaseHeld{
+  release,err:=bunnyquota.ExecutionLease(ctx,root,p.EngagementID)
+  if err!=nil{return EvidenceSummary{},fmt.Errorf("shared Python execution lease denied: %w",err)}
+  defer release()
+ }
+ if !runner.BudgetReserved{
+  if _,err:=bunnyquota.Reserve(ctx,root,p.EngagementID,len(p.Cases),policy.MaxNetworkCalls);err!=nil{
+   return EvidenceSummary{},fmt.Errorf("shared engagement request budget denied: %w",err)
+  }
+ }
  if err:=os.MkdirAll(root,0700);err!=nil{return EvidenceSummary{},err}
  dir:=filepath.Join(root,p.RunID)
  if err:=os.Mkdir(dir,0700);err!=nil{return EvidenceSummary{},err}
