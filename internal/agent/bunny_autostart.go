@@ -102,6 +102,7 @@ func securityActionStatus(name string)string{
   return "Checking evidence"
  case "auth_workflow_lab":return "Testing synthetic sign-in"
  case "research_next_step":return "Evaluating test signals"
+ case "exploration_timeline":return "Recording exploration history"
  case "list_roles":return "Selecting specialists"
  case "delegate_task":return "Starting specialist inspection"
  case "report_finding","triage_finding":return "Recording finding evidence"
