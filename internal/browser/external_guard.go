@@ -105,7 +105,13 @@ func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
     } `json:"targetInfo"`
    }
    if json.Unmarshal(params,&attached)==nil&&attached.TargetInfo.Type=="page"{
-    s.acceptPopup(c,g,attached.SessionID,attached.TargetInfo.TargetID,attached.TargetInfo.URL)
+    if attached.TargetInfo.TargetID==s.targetID{
+     resumeCtx,cancel:=context.WithTimeout(context.Background(),4*time.Second)
+     _,_=c.send(resumeCtx,attached.SessionID,"Runtime.runIfWaitingForDebugger",nil)
+     cancel()
+    }else{
+     s.acceptPopup(c,g,attached.SessionID,attached.TargetInfo.TargetID,attached.TargetInfo.URL)
+    }
    }
    return
   case "Target.detachedFromTarget":
