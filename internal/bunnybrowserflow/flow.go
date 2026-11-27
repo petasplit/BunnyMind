@@ -219,7 +219,8 @@ func runTrusted(ctx context.Context,p Plan,factory Factory,secrets Secrets,opera
   if recorder,ok:=b.(TrafficObserver);ok&&len(result.Traffic)<MaxTrafficReceipts{
    allowedOrigins:=approved
    if allowedOrigins==nil{allowedOrigins=map[string]bool{origin:true}}
-   receipts:=recorder.CaptureTraffic(ctx,s.Actor,i+1,allowedOrigins)
+   receipts,e:=recorder.CaptureTraffic(ctx,s.Actor,i+1,allowedOrigins)
+   if e!=nil{return Result{},errors.New("configured HTTP evidence capture failed")}
    remaining:=MaxTrafficReceipts-len(result.Traffic)
    if len(receipts)>remaining{receipts=receipts[:remaining]}
    result.Traffic=append(result.Traffic,receipts...)
