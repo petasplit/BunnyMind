@@ -61,6 +61,13 @@ reject an entry; no agent can promote it to a verified vulnerability directly.
 Session-based separation is not cryptographic identity verification, and
 separate Antares processes still lack cross-process locking.
 
+**v0.8 — BunnyPlanner:** BunnyGraph's optional `update_and_suggest`
+action creates a deterministic list of review-only task suggestions (maximum
+64) from inventory changes. It uses fixed priorities, collapses duplicate
+changes and produces task IDs compatible with the v0.4 task board. No task
+is automatically scheduled or executed, and caller-supplied inventory changes
+do not become verified security facts merely by producing a task.
+
 ## Gaps, ordered by real-world value
 
 1. Extend v0.5 network checks from the restricted reader to all relevant
@@ -69,8 +76,9 @@ separate Antares processes still lack cross-process locking.
    and automatically link v0.7 observations to v0.4 task queues.
 3. Independently observed and authenticated evidence receipts with trace links
    to the original request/response and negative controls; replay on fixed code.
-4. Ingest v0.6 graph snapshots from trusted captures and source scans;
-   automate dependency-aware re-review of changed assets and stale-result invalidation.
+4. Ingest v0.6 graph snapshots from trusted captures and source scans, then
+   connect v0.8 review suggestions to the durable engagement coordinator with
+   explicitly approved scheduling and stale-result invalidation.
 5. Documented authentication test personas and non-production test sessions.
 6. Bounded, resumable verifier/fix/review workflows with operator approvals,
    deterministic lab success gates, cost/time budgets and rollback.
