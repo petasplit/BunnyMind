@@ -49,6 +49,18 @@ Expected high-level result:
 
 The command performs no HTTP requests and prints no raw cookies, HTTP response bodies or decrypted private account information. To share results, send a *private, appropriately minimized* encrypted evidence bundle with the report; do not post raw session cookies or personal records to public GitHub discussions.
 
+## Windows executable from GitHub Actions
+
+In PR #32, open the **BunnyMind Evidence Auditor Windows x64** workflow run, then download the `bunnymind-evidence-audit-win-x64` build artifact after it passes. It contains `bunny-audit-windows-amd64.exe` and `SHA256SUMS.txt`. Verify the executable checksum before using it. The executable is a local offline auditor; it does not contain or export your encryption key.
+
+Run it in PowerShell on Windows 10/11:
+
+```powershell
+.\\bunny-audit-windows-amd64.exe --run ".\\BunnyMindEvidence\\authresearch01\\authresearch01-r01"
+```
+
+The Windows workflow runs audit unit tests before publishing the executable. A draft PR and artifact are not a signed production release; review source and test results before relying on the binary.
+
 ## Security model and remaining gaps
 
 1. Seals require the operator's existing OS-keyring evidence key; a copied bundle cannot be verified by someone who lacks that key or an independently issued verification attestation.
