@@ -36,6 +36,7 @@ func init() {
 		harContextInventoryTool{},
 		authAccessMatrixTool{},
 		authBrowserLabTool{},
+		approvedBrowserAuthTool{},
 		reportFindingTool{},
 		triageFindingTool{},
 		addIntelTool{},
