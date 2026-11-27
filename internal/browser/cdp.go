@@ -206,6 +206,7 @@ type Options struct {
  ExternalPostPaths []string
  ExternalProxyURL string
  ExternalMaxRequests int
+ ExternalMinIntervalMS int
  // LoopbackOrigin, when set, isolates the new browser session to this exact
  // numeric-loopback HTTP origin with request-stage CDP interception. Intended
  // exclusively for disposable local fixtures, never for public-host testing.
