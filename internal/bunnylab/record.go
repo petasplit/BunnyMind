@@ -26,6 +26,7 @@ type Probe struct {
  SampleID string `json:"sample_id"`
  Kind string `json:"kind"`
  Path string `json:"path"`
+ Persona string `json:"persona,omitempty"`
 }
 type Plan struct {
  EngagementID string `json:"engagement_id"`
@@ -78,7 +79,7 @@ func Validate(plan Plan)error{
  seen:=map[string]bool{}
  positives,controls:=0,0
  for _,p:=range plan.Probes{
-  first.SampleID=p.SampleID;first.Kind=p.Kind
+  first.SampleID=p.SampleID;first.Kind=p.Kind;first.Actor=p.Persona
   if err:=bunnyreceipt.ValidObservation(first);err!=nil{return fmt.Errorf("invalid probe metadata: %w",err)}
   if seen[p.SampleID]{return errors.New("duplicate probe sample IDs")}
   seen[p.SampleID]=true
@@ -92,6 +93,12 @@ func Validate(plan Plan)error{
 // origin. Redirects, large bodies and all non-loopback destinations fail.
 // Only signed metadata is returned; response bodies remain in memory.
 func Capture(ctx context.Context,plan Plan,private ed25519.PrivateKey)(bunnyreceipt.Bundle,error){
+ return CaptureWithPersonas(ctx,plan,private,nil)
+}
+// CaptureWithPersonas injects synthetic lab-only bearer tokens supplied by
+// a trusted recorder, not by the AI model or a request plan. Tokens are never
+// put into signed receipts, response summaries, or filesystem logs.
+func CaptureWithPersonas(ctx context.Context,plan Plan,private ed25519.PrivateKey,personas map[string]string)(bunnyreceipt.Bundle,error){
  if len(private)!=ed25519.PrivateKeySize{return bunnyreceipt.Bundle{},errors.New("invalid Ed25519 private key")}
  if err:=Validate(plan);err!=nil{return bunnyreceipt.Bundle{},err}
  u,_:=loopbackOrigin(plan.Origin)
@@ -124,7 +131,14 @@ func Capture(ctx context.Context,plan Plan,private ed25519.PrivateKey)(bunnyrece
   full:=plan.Origin+probe.Path
   request,err:=http.NewRequestWithContext(ctx,"GET",full,nil)
   if err!=nil{return bunnyreceipt.Bundle{},err}
-  request.Header.Set("User-Agent","BunnyMind-LocalLab-Recorder/0.11")
+  request.Header.Set("User-Agent","BunnyMind-LocalLab-Recorder/0.12")
+  if probe.Persona!=""&&probe.Persona!="anonymous"{
+   token,ok:=personas[probe.Persona]
+   if !ok||len(token)<8||len(token)>512||strings.ContainsAny(token," \t\r\n"){
+    return bunnyreceipt.Bundle{},errors.New("synthetic persona requires a valid privately supplied token")
+   }
+   request.Header.Set("Authorization","Bearer "+token)
+  }
   response,err:=client.Do(request)
   if err!=nil{return bunnyreceipt.Bundle{},fmt.Errorf("local probe failed (%s): %w",probe.SampleID,err)}
   payload,readErr:=io.ReadAll(io.LimitReader(response.Body,MaxBody+1))
@@ -138,8 +152,10 @@ func Capture(ctx context.Context,plan Plan,private ed25519.PrivateKey)(bunnyrece
   reflected:=strings.Contains(probe.Path,plan.Marker)||strings.Contains(decodedPath,plan.Marker)
   obs:=bunnyreceipt.Observation{
    Version:1,EngagementID:plan.EngagementID,RunID:plan.RunID,CaseID:plan.CaseID,
-   SampleID:probe.SampleID,Kind:probe.Kind,Method:"GET",Origin:plan.Origin,
-   RequestSHA256:bunnyreceipt.Dig("GET\n"+full),
+   SampleID:probe.SampleID,Kind:probe.Kind,Actor:probe.Persona,Method:"GET",Origin:plan.Origin,
+   // Include the non-secret persona label in the request digest. Do not
+   // hash weak test bearer tokens: an offline digest could expose them.
+   RequestSHA256:bunnyreceipt.Dig("GET\n"+full+"\nactor:"+probe.Persona),
    ResponseSHA256:bunnyreceipt.Dig(string(payload)),
    MarkerSHA256:bunnyreceipt.Dig(plan.Marker),
    ResponseStatus:response.StatusCode,MarkerPresent:strings.Contains(string(payload),plan.Marker),
