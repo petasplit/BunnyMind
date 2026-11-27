@@ -24,6 +24,9 @@ type AdaptiveConfig struct {
  MagicLinkPrefixes []string `json:"magic_link_prefixes,omitempty"`
  IdPOrigins []string `json:"idp_origins,omitempty"`
  CaptchaTestMode bool `json:"captcha_test_mode,omitempty"`
+ PasskeyMode string `json:"passkey_mode,omitempty"`
+ AllowNaturalCaptcha bool `json:"allow_natural_captcha,omitempty"`
+
  Mailboxes map[string]MailboxSettings `json:"mailboxes,omitempty"`
 }
 type OTPProvider interface {
@@ -65,7 +68,13 @@ func ValidateAdaptive(cfg AdaptiveConfig,scope ApprovedScope,manifest bunnyguard
    if !safePath(prefix){return errors.New("invalid operator-approved magic link path prefix")}
   }
  }else if len(cfg.MagicLinkPrefixes)!=0{return errors.New("unexpected magic link path allowlist")}
- if len(cfg.IdPOrigins)>8{return errors.New("too many approved identity-provider origins")}
+ switch cfg.PasskeyMode{
+ case "","off","platform":
+ case "virtual_test":
+  if !scope.AllowVirtualPasskey{return errors.New("virtual passkey requires explicit test-scope approval")}
+ default:return errors.New("unsupported WebAuthn mode")
+ }
+  if len(cfg.IdPOrigins)>8{return errors.New("too many approved identity-provider origins")}
  seenIDP:=map[string]bool{}
  for _,raw:=range cfg.IdPOrigins{
   idp,err:=strictOrigin(raw)
