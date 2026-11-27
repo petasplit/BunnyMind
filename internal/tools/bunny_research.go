@@ -1,8 +1,10 @@
 package tools
 
 import (
+ "bytes"
  "context"
  "encoding/json"
+ "io"
 
  "github.com/enowdev/antares/internal/bunnyresearch"
 )
@@ -50,7 +52,12 @@ func (researchNextStepTool) Execute(_ context.Context,in Input)Result{
   Budget int `json:"budget"`
   Observations []bunnyresearch.Observation `json:"observations"`
  }
- if err:=in.Bind(&args);err!=nil{return Errorf("invalid research state: %v",err)}
+ if len(in.Args)==0||len(in.Args)>32*1024{return Errorf("research state must be 1..32768 bytes")}
+ d:=json.NewDecoder(bytes.NewReader(in.Args))
+ d.DisallowUnknownFields()
+ if err:=d.Decode(&args);err!=nil{return Errorf("invalid research state: %v",err)}
+ var extra any
+ if err:=d.Decode(&extra);err!=io.EOF{return Errorf("research state must contain exactly one JSON object")}
  if args.Action=="mint_benign_canary"{
   s,err:=bunnyresearch.Canary();if err!=nil{return Errorf("could not create benign canary: %v",err)}
   return Text(s)

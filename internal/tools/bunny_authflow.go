@@ -1,8 +1,10 @@
 package tools
 
 import (
+ "bytes"
  "context"
  "encoding/json"
+ "io"
 
  "github.com/enowdev/antares/internal/bunnyauthflow"
 )
@@ -31,7 +33,14 @@ func (authWorkflowLabTool) Schema()map[string]any{
 }
 func (authWorkflowLabTool) Execute(ctx context.Context,in Input)Result{
  var args struct{DeliberateExposure bool `json:"deliberate_exposure"`}
- if err:=in.Bind(&args);err!=nil{return Errorf("invalid synthetic auth workflow options: %v",err)}
+ dec:=json.NewDecoder(bytes.NewReader(in.Args))
+ dec.DisallowUnknownFields()
+ if len(in.Args)>2048{return Errorf("synthetic auth workflow options too large")}
+ if len(in.Args)>0{
+  if err:=dec.Decode(&args);err!=nil{return Errorf("invalid synthetic auth workflow options: %v",err)}
+  var extra any
+  if err:=dec.Decode(&extra);err!=io.EOF{return Errorf("synthetic auth workflow accepts only one JSON object")}
+ }
  result,err:=bunnyauthflow.Run(ctx,args.DeliberateExposure)
  if err!=nil{return Errorf("isolated authentication workflow failed: %v",err)}
  b,err:=json.MarshalIndent(result,"","  ")
