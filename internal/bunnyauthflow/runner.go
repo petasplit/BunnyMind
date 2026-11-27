@@ -14,6 +14,7 @@ import (
  "time"
 
  "github.com/enowdev/antares/internal/bunnyidentity"
+ "github.com/enowdev/antares/internal/bunnychallenge"
 )
 
 const MaxCalls=28
@@ -121,10 +122,15 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  // enrollment and no test-account data is exposed to the agent tool.
  vault:=bunnyidentity.New()
  defer vault.Close()
- coordinator:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault}
+ broker,err:=bunnychallenge.New(nil)
+ if err!=nil{return Outcome{},err}
+ coordinator:=Coordinator{Registration:LocalRegistrationPort{client},Inbox:box,Sessions:vault,Challenges:broker}
  a,err:=coordinator.Provision(ctx,"owner",alice);if err!=nil{return Outcome{},err}
  b,err:=coordinator.Provision(ctx,"foreign",bob);if err!=nil{return Outcome{},err}
  aliceResource,bobResource:=a.ResourceID,b.ResourceID
+ if !a.ChallengeCompleted||!b.ChallengeCompleted||broker.Count()!=2{
+  return Outcome{},errors.New("synthetic email verification tickets did not complete")
+ }
  if aliceResource==bobResource{return Outcome{},errors.New("synthetic resources not isolated")}
  distinct:=false
  err=vault.Use("owner",func(ownerToken,_ string)error{

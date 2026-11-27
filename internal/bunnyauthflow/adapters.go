@@ -2,11 +2,14 @@ package bunnyauthflow
 
 import (
  "context"
+ "crypto/sha256"
+ "encoding/hex"
  "errors"
  "net/http"
  "time"
 
  "github.com/enowdev/antares/internal/bunnyidentity"
+ "github.com/enowdev/antares/internal/bunnychallenge"
 )
 
 // RegistrationPort is supplied by trusted application code, never by a
@@ -23,12 +26,14 @@ type Coordinator struct{
  Registration RegistrationPort
  Inbox InboxPort
  Sessions *bunnyidentity.Vault
+ Challenges *bunnychallenge.Broker
 }
 type Enrollment struct{
  Actor string `json:"actor"`
  ResourceID string `json:"resource_id"`
  CodeConsumed bool `json:"code_consumed"`
  SessionVaulted bool `json:"session_vaulted"`
+ ChallengeCompleted bool `json:"challenge_completed"`
 }
 // Provision registers a synthetic account, reads the trusted inbox,
 // extracts the code, exchanges it for a bearer token, and stores that token
@@ -38,6 +43,12 @@ func (c Coordinator) Provision(ctx context.Context,actor,email string)(Enrollmen
   return Enrollment{},errors.New("trusted auth adapter, inbox and vault are required")
  }
  if !allowedEmail.MatchString(email){return Enrollment{},errors.New("only synthetic example.test identities are permitted")}
+ challengeID:=""
+ if c.Challenges!=nil{
+  ticket,err:=c.Challenges.Open(actor,bunnychallenge.EmailOTP,OTPExpiry)
+  if err!=nil{return Enrollment{},err}
+  challengeID=ticket.ID
+ }
  if err:=c.Registration.Register(ctx,email);err!=nil{return Enrollment{},err}
  msg,err:=c.Inbox.Latest(ctx,email);if err!=nil{return Enrollment{},err}
  code,err:=ExtractCode(msg,email);if err!=nil{return Enrollment{},err}
@@ -46,7 +57,19 @@ func (c Coordinator) Provision(ctx context.Context,actor,email string)(Enrollmen
  if err:=c.Sessions.Add(actor,token,resource,15*time.Minute);err!=nil{
   return Enrollment{},errors.New("synthetic session could not be stored")
  }
- return Enrollment{Actor:actor,ResourceID:resource,CodeConsumed:true,SessionVaulted:true},nil
+ challengeCompleted:=false
+ if c.Challenges!=nil{
+  // A high-entropy successful session grant is safe to hash. Never hash
+  // six-digit OTPs or put the OTP itself into challenge metadata.
+  digest:=sha256.Sum256([]byte(token))
+  proof:=hex.EncodeToString(digest[:])
+  if _,err:=c.Challenges.EmailCompleted(challengeID,proof);err!=nil{
+   c.Sessions.Revoke(actor)
+   return Enrollment{},errors.New("trusted challenge could not be completed")
+  }
+  challengeCompleted=true
+ }
+ return Enrollment{Actor:actor,ResourceID:resource,CodeConsumed:true,SessionVaulted:true,ChallengeCompleted:challengeCompleted},nil
 }
 
 // LocalRegistrationPort is the only adapter implemented in v0.18.
