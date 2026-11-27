@@ -2,6 +2,8 @@ package bunnyauthflow
 
 import (
  "context"
+ "crypto/sha256"
+ "encoding/hex"
  "encoding/json"
  "errors"
  "fmt"
@@ -15,11 +17,13 @@ import (
 
  "github.com/enowdev/antares/internal/bunnyidentity"
  "github.com/enowdev/antares/internal/bunnychallenge"
+ "github.com/enowdev/antares/internal/bunnymatrix"
 )
 
 const MaxCalls=28
 type Outcome struct{
  Outcome string `json:"outcome"`
+ AccessComparison string `json:"access_comparison"`
  AccountsCreated int `json:"accounts_created"`
  EmailChallengeTicketsCompleted int `json:"email_challenge_tickets_completed"`
  MailMessagesRead int `json:"mail_messages_read"`
@@ -160,15 +164,19 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  }
  st,owner,err:=fromVault("owner","GET","/resource/"+aliceResource,nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
+ ownerStatus:=st
  ownerMarker:=owner["marker"]
  if len(ownerMarker)<24{return Outcome{},errors.New("no synthetic owner marker")}
  out.OwnerAccessObserved=true
  st,foreign,err:=fromVault("foreign","GET","/resource/"+aliceResource,nil)
  if err!=nil{return Outcome{},err}
- out.ForeignAccessObserved=(st==200&&foreign["marker"]==ownerMarker)
+ foreignStatus:=st
+ foreignMarker:=foreign["marker"]
+ out.ForeignAccessObserved=(st==200&&foreignMarker==ownerMarker)
  foreignDenied:=st==403||st==404
  st,_,err=client.request(ctx,"GET","/resource/"+aliceResource,"",nil)
  if e:=mustStatus(st,401,err);e!=nil{return Outcome{},e}
+ anonymousStatus:=st
  out.AnonymousDenied=true
  st,me,err:=fromVault("foreign","GET","/me",nil)
  if e:=mustStatus(st,200,err);e!=nil{return Outcome{},e}
@@ -221,6 +229,32 @@ func Run(ctx context.Context,deliberateExposure bool)(Outcome,error){
  if out.ForeignAccessObserved {out.Outcome="cross_user_access_observed_in_synthetic_lab"
  }else if foreignDenied {out.Outcome="cross_user_denied_in_synthetic_lab"
  }else{out.Outcome="inconclusive"}
+ // Convert actual synthetic HTTP observations to the same differential
+ // evidence schema used by the offline multi-persona review tool. Only the
+ // harmless fixture marker's digest leaves this local function.
+ hashText:=func(value string)string{
+  digest:=sha256.Sum256([]byte(value))
+  return hex.EncodeToString(digest[:])
+ }
+ fixtureObs:=func(id,actor string,status int,marker string)bunnymatrix.Observation{
+  signal:="absent";markerDigest:=""
+  if marker!=""{signal="present";markerDigest=hashText(marker)}
+  return bunnymatrix.Observation{
+   ID:id,CaseID:"fixture-resource-A",EndpointID:"fixture_resource",
+   ResourceSHA256:hashText(aliceResource),
+   OwnerID:"owner",ActorID:actor,Method:"GET",Status:status,
+   MarkerSignal:signal,MarkerSHA256:markerDigest,
+   EvidenceSHA256:hashText(id+"|"+aliceResource+"|"+fmt.Sprint(status)+"|"+marker),
+   Source:"synthetic_fixture",
+  }
+ }
+ comparison,err:=bunnymatrix.Analyze([]bunnymatrix.Observation{
+  fixtureObs("local-owner","owner",ownerStatus,ownerMarker),
+  fixtureObs("local-peer","foreign",foreignStatus,foreignMarker),
+  fixtureObs("local-anon","anonymous",anonymousStatus,""),
+ })
+ if err!=nil{return Outcome{},fmt.Errorf("synthetic access matrix failed: %w",err)}
+ out.AccessComparison=comparison.Cases[0].Status
  out.RequestCount=client.calls
  return out,nil
 }
