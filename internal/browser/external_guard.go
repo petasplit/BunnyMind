@@ -10,6 +10,7 @@ import (
  "strconv"
  "strings"
  "sync/atomic"
+ "sync"
  "time"
 )
 
@@ -20,6 +21,9 @@ type externalGate struct{
  allowed map[string]bool
  postPaths map[string]bool
  max int64
+ minInterval time.Duration
+ pacingMu sync.Mutex
+ next time.Time
  calls atomic.Int64
  blocked atomic.Int64
 }
@@ -39,11 +43,11 @@ func validateExternalPostPath(path string)bool{
  strings.Contains(path,"%")||strings.Contains(path,".."){return false}
  return true
 }
-func newExternalGate(origins,postPaths []string,max int)(*externalGate,error){
- if len(origins)==0||len(origins)>32||max<1||max>1000||len(postPaths)>64{
+func newExternalGate(origins,postPaths []string,max,minIntervalMS int)(*externalGate,error){
+ if len(origins)==0||len(origins)>32||max<1||max>1000||minIntervalMS<0||minIntervalMS>5000||len(postPaths)>64{
   return nil,errors.New("external browser requires bounded scope, request budget and POST paths")
  }
- g:=&externalGate{allowed:map[string]bool{},postPaths:map[string]bool{},max:int64(max)}
+ g:=&externalGate{allowed:map[string]bool{},postPaths:map[string]bool{},max:int64(max),minInterval:time.Duration(minIntervalMS)*time.Millisecond}
  for _,s:=range origins{
   o,err:=canonicalHTTPSOrigin(s);if err!=nil{return nil,err}
   g.allowed[o]=true
@@ -66,7 +70,12 @@ func (g *externalGate) allow(raw,method string)bool{
   if !g.postPaths[u.EscapedPath()]{return false}
  default:return false
  }
- return g.calls.Add(1)<=g.max
+ if g.calls.Add(1)>g.max{return false}
+ g.pacingMu.Lock()
+ if delay:=time.Until(g.next);delay>0{time.Sleep(delay)}
+ g.next=time.Now().Add(g.minInterval)
+ g.pacingMu.Unlock()
+ return true
 }
 func externalProxyAddress(raw string)(string,error){
  u,err:=url.Parse(raw)
@@ -81,7 +90,7 @@ func externalProxyAddress(raw string)(string,error){
  return "http://"+u.Host,nil
 }
 func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
- g,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests)
+ g,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests,s.opts.ExternalMinIntervalMS)
  if err!=nil{return err}
  if _,err:=externalProxyAddress(s.opts.ExternalProxyURL);err!=nil{return err}
  c.setOnEvent(func(method string,params json.RawMessage,sessionID string){
