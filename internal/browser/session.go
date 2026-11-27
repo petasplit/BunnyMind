@@ -92,7 +92,7 @@ func (s *Session) Start(ctx context.Context) error {
     return errors.New("external scoped browser requires a fresh Chromium without remote debugger, stealth, or persistent profile")
   }
   if _,err:=externalProxyAddress(s.opts.ExternalProxyURL);err!=nil{return err}
-  if _,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests);err!=nil{return err}
+  if _,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests,s.opts.ExternalMinIntervalMS);err!=nil{return err}
  }
  if s.opts.LoopbackOrigin!=""{
   if _,err:=parseLoopbackOrigin(s.opts.LoopbackOrigin);err!=nil{return err}
