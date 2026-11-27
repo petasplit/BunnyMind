@@ -1,0 +1,29 @@
+{
+  "engagement_id": "local_lab",
+  "run_id": "demo_run_1",
+  "case_id": "synthetic_marker_case",
+  "origin": "http://127.0.0.1:8765",
+  "marker": "BUNNYMIND_LAB_MARKER_12345",
+  "probes": [
+    {
+      "sample_id": "positive_1",
+      "kind": "positive",
+      "path": "/positive"
+    },
+    {
+      "sample_id": "control_1",
+      "kind": "control",
+      "path": "/control"
+    },
+    {
+      "sample_id": "positive_2",
+      "kind": "positive",
+      "path": "/positive"
+    },
+    {
+      "sample_id": "control_2",
+      "kind": "control",
+      "path": "/control"
+    }
+  ]
+}
