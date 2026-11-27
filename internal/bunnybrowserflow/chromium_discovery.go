@@ -72,21 +72,25 @@ const authDiscoveryScript = `(() => {
    kind = /(register|sign.?up|create account)/.test(pageHint) || !!kinds.password_confirm ? 'signup' : 'login';
  } else if (kinds.email || kinds.username) kind='login';
  let signupPath = '';
+ let loginPath = '';
  for (const el of Array.from(document.querySelectorAll('a[href]')).slice(0,64)) {
    if (!visible(el)) continue;
    const caption = (el.innerText || '').trim().toLowerCase().slice(0,70);
-   if (!/(create account|register|sign.?up)/.test(caption)) continue;
+   const signup = /(create account|register|sign.?up)/.test(caption);
+   const login = /(sign.?in|log.?in)/.test(caption);
+   if (!signup && !login) continue;
    try {
      const uri = new URL(el.href, location.href);
      if (uri.origin === location.origin && !uri.search && !uri.hash &&
          /^\/[A-Za-z0-9_./%-]*$/.test(uri.pathname) &&
          !uri.pathname.includes('..') && !uri.pathname.includes('%')) {
-       signupPath = uri.pathname;
-       break;
+       if (signup && !signupPath) signupPath = uri.pathname;
+       if (login && !loginPath) loginPath = uri.pathname;
+       if (signupPath && loginPath) break;
      }
    } catch (_) {}
  }
- return {kind,fields,submit_selector:submit,ambiguous:candidates>1,challenge,signup_path:signupPath};
+ return {kind,fields,submit_selector:submit,ambiguous:candidates>1,challenge,signup_path:signupPath,login_path:loginPath};
 })()`
 
 func (d *chromeDriver) DiscoverAuth(ctx context.Context)(AuthPageState,error){
