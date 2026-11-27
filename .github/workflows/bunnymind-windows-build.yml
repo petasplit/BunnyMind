@@ -42,7 +42,8 @@ jobs:
           mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authz-demo-windows-x64.exe ./cmd/bunnyauthz-demo
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-fix-demo-windows-x64.exe ./cmd/bunnyfix-demo
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -50,6 +51,7 @@ jobs:
           path: |
             dist/BunnyMind-windows-x64.exe
             dist/BunnyMind-authz-demo-windows-x64.exe
+            dist/BunnyMind-fix-demo-windows-x64.exe
             dist/SHA256SUMS.txt
           retention-days: 7
 
@@ -89,3 +91,22 @@ jobs:
           Write-Host 'PASS: Windows secure fixture denied cross-user access'
           Write-Host 'PASS: Windows deliberately vulnerable fixture exposed synthetic marker'
           Write-Host 'PASS: both scenarios produced eight signed synthetic samples'
+          $fixExe = Join-Path $PWD 'dist/BunnyMind-fix-demo-windows-x64.exe'
+          if (-not (Test-Path $fixExe)) { throw "Windows fix demo executable missing" }
+          $modes = @(
+            @{ Mode='remediation'; Expected='remediation_observed_in_lab' },
+            @{ Mode='regression'; Expected='regression_observed_in_lab' },
+            @{ Mode='persistent'; Expected='unchanged_exposure_in_lab' },
+            @{ Mode='denied'; Expected='unchanged_denial_in_lab' }
+          )
+          foreach ($case in $modes) {
+            $raw = & $fixExe -mode $case.Mode -json
+            if ($LASTEXITCODE -ne 0) { throw "Fix demo failed for mode $($case.Mode)" }
+            $result = ($raw -join "`n") | ConvertFrom-Json
+            if ($result.outcome -ne $case.Expected -or
+                $result.before_signed_samples -ne 8 -or
+                $result.after_signed_samples -ne 8) {
+              throw "Fix comparison failed for mode $($case.Mode)"
+            }
+            Write-Host "PASS: signed local before/after mode $($case.Mode)"
+          }
