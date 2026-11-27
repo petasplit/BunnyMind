@@ -57,6 +57,12 @@ func (s *Session) acceptPopup(c *conn,g *externalGate,sessionID,targetID,targetU
    return
   }
  }
+ if s.opts.VirtualPasskey{
+  if err:=s.setupVirtualPasskey(ctx,c,sessionID);err!=nil{
+   _,_=c.send(ctx,"","Target.closeTarget",map[string]any{"targetId":targetID})
+   return
+  }
+ }
  s.popupMu.Lock()
  s.popupSessions=append(s.popupSessions,popupSession{sessionID:sessionID,targetID:targetID})
  s.popupMu.Unlock()
