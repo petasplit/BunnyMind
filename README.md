@@ -1,3 +1,9 @@
+> **BunnyMind — experimental Antares fork**  
+> This repository extends [enowdev/antares](https://github.com/enowdev/antares) with an opt-in engagement policy, offline evidence review, and repeatable local benchmark scoring. Development is staged through [PR #1](https://github.com/petasplit/BunnyMind/pull/1), [PR #2](https://github.com/petasplit/BunnyMind/pull/2), and [PR #3](https://github.com/petasplit/BunnyMind/pull/3). These changes are **not yet merged to main**. None of the enhancements establishes real-world vulnerability detection performance or a complete network security boundary. See [BunnyMind foundation](docs/BUNNYMIND_FOUNDATION.md), [evidence review](docs/BUNNYMIND_EVIDENCE.md), and [benchmark methodology](docs/BUNNYMIND_BENCHMARK.md).  
+> Keep real credentials and private bug bounty evidence out of public issues, commits and CI logs. Upstream Antares remains Apache-2.0 licensed and credited below.
+
+---
+
 <p align="center">
   <img src=".github/antares.webp" alt="Antares" width="180">
 </p>
