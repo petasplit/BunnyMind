@@ -172,5 +172,6 @@ func RunAdaptive(ctx context.Context,cfg AdaptiveConfig,scope ApprovedScope,mani
   if !complete{return Result{},fmt.Errorf("authentication for %s remained unverified within experiment budget",actor)}
  }
  result.Actors=len(sessions)
+ result.NextChecks=AnalyzeAuthNextChecks(result)
  return result,nil
 }
