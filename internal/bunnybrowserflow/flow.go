@@ -70,6 +70,7 @@ type Result struct{
  Actors int `json:"actors"`
  StepsCompleted int `json:"steps_completed"`
  Events []Event `json:"events"`
+ Traffic []TrafficReceipt `json:"traffic,omitempty"`
  Disclaimer string `json:"disclaimer"`
 }
 
@@ -211,6 +212,14 @@ func runTrusted(ctx context.Context,p Plan,factory Factory,secrets Secrets,opera
    Seq:i+1,Actor:s.Actor,Action:s.Op,Outcome:"succeeded",
    EvidenceSHA256:proof(s.Actor,s.Op,"succeeded",i+1),
   })
+  if recorder,ok:=b.(TrafficObserver);ok&&len(result.Traffic)<MaxTrafficReceipts{
+   allowedOrigins:=approved
+   if allowedOrigins==nil{allowedOrigins=map[string]bool{origin:true}}
+   receipts:=recorder.CaptureTraffic(ctx,s.Actor,i+1,allowedOrigins)
+   remaining:=MaxTrafficReceipts-len(result.Traffic)
+   if len(receipts)>remaining{receipts=receipts[:remaining]}
+   result.Traffic=append(result.Traffic,receipts...)
+  }
   result.StepsCompleted++
  }
  result.Actors=len(sessions)
