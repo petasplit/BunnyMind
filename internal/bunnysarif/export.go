@@ -8,6 +8,7 @@ import (
  "encoding/hex"
  "encoding/json"
  "net/url"
+ "sort"
  "strings"
 
  "github.com/enowdev/antares/internal/findings"
