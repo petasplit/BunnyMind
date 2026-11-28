@@ -347,13 +347,11 @@ func validateDaemonState(state daemonState) (bool, error) {
 	}
 	wantExe, _ := filepath.EvalSymlinks(state.Exe)
 	if runtime.GOOS == "windows" {
-		// Windows' tasklist implementation returns only an image basename,
-		// not a full path. Windows also does not expose process argv via
-		// processArguments. Reject mismatched image names but do not mark
-		// a healthy managed daemon dead because path/argv are unavailable.
-		// The managed PID, start identity and health/port ownership are
-		// validated separately by waitDaemonReady.
-		return strings.EqualFold(filepath.Base(exe), filepath.Base(wantExe)), nil
+		// QueryFullProcessImageName provides the full, non-truncated Win32
+		// path and GetProcessTimes provides a PID-reuse-resistant creation
+		// timestamp. Managed Windows processes do not need argv inspection.
+		// waitDaemonReady also checks actual port ownership and API health.
+		return strings.EqualFold(filepath.Clean(exe), filepath.Clean(wantExe)), nil
 	}
 	if exe != wantExe {
 		return false, nil
