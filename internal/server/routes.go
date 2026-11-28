@@ -329,7 +329,21 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Client-side routes have no matching file; serve the SPA entry instead.
 	info, err := fs.Stat(s.distFS, path)
 	if err != nil || info.IsDir() {
+		// A missing hashed asset MUST return 404. Returning the SPA HTML
+		// instead creates a successful text/html response to an ES module
+		// import, which the browser reports as a generic dynamic import
+		// failure (often after an update with an older cached parent chunk).
+		if strings.HasPrefix(path, "assets/") {
+			w.Header().Set("Cache-Control", "no-store")
+			http.NotFound(w, r)
+			return
+		}
 		path = "index.html"
+		info, err = fs.Stat(s.distFS, path)
+		if err != nil || info.IsDir() {
+			http.Error(w, "embedded dashboard index unavailable", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Hashed assets are immutable; the entry document must never be cached, or
