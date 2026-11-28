@@ -42,6 +42,7 @@ func parseDiscovery(raw []byte)(BrowserDiscovery,error){
  if len(raw)==0||len(raw)>160*1024{return d,errors.New("browser discovery JSON missing or oversized")}
  if err:=json.Unmarshal(raw,&d);err!=nil{return d,err}
  if len(d.Links)>128||len(d.ScriptURLs)>64||len(d.InlineScripts)>12||len(d.ObservedResources)>128{return d,errors.New("browser discovery collection unbounded")}
+ for _,v:=range d.InlineScripts{if len(v)>3000{return d,errors.New("browser inline script exceeds per-element limit")}}
  return d,nil
 }
 func sameHTTPSOrigin(origin,raw string)bool{
