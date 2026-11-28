@@ -137,7 +137,12 @@ func (a *Agent) executeKickoff(ctx context.Context,req Request,sess *store.Sessi
  if err:=emit(Event{Type:EventNotice,Message:securityActionStatus(name)});err!=nil{return history,false,"",err}
  history=append(history,llm.Message{Role:llm.RoleAssistant,ToolCalls:[]llm.ToolCall{call}})
  if !req.Quiet{a.persistAssistant(ctx,sess.ID,modelName,&llm.Response{ToolCalls:[]llm.ToolCall{call}})}
- results:=a.executeTools(ctx,[]llm.ToolCall{call},byName,req,sess,emit)
+ raw:=""
+ tap:=func(event Event)error{
+  if event.Type==EventToolResult&&event.ID==call.ID&&!event.IsError{raw=event.Content}
+  return emit(event)
+ }
+ results:=a.executeTools(ctx,[]llm.ToolCall{call},byName,req,sess,tap)
  for _,out:=range results{
   if !req.Quiet {
    if err:=a.db.AppendMessage(ctx,&store.Message{
@@ -148,8 +153,6 @@ func (a *Agent) executeKickoff(ctx context.Context,req Request,sess *store.Sessi
   }
  }
  history=appendTurnMessages(history,results,"",nil)
- raw:=""
- if len(results)>0&&!results[0].isError{raw=results[0].message.Content}
  return history,true,raw,nil
 }
 
