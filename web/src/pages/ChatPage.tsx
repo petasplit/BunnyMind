@@ -615,9 +615,8 @@ export default function ChatPage() {
       .then((d) => {
         if (cancelled) return
         const restored = hydrate(d)
-        // Open a restored transcript at its newest message. Set before the list
-        // mounts (it is still `loading`), so Virtuoso reads the final value once.
-        initialIndexRef.current = { index: Math.max(0, splitTranscriptTurns(restored).length - 1), align: 'end' }
+        // The native transcript scroller opens at the bottom when it mounts.
+        // Unlike Virtuoso it does not require an initial virtual index.
         setMessages(restored)
         setTitle(d.session.title || t('chat.conversation'))
         setProjectDir(d.session.meta?.project_dir ?? '')
