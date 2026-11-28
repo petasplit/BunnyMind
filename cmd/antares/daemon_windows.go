@@ -3,118 +3,106 @@
 package main
 
 import (
-	"errors"
-	"os"
-	"os/exec"
-	"strconv"
-	"strings"
-	"syscall"
+    "errors"
+    "os"
+    "os/exec"
+    "strconv"
+    "strings"
+    "syscall"
+
+    "golang.org/x/sys/windows"
 )
 
-// Windows has no fork/setsid. A detached background process is created with
-// CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS so it outlives the launching
-// console. Process identity is read via `tasklist`, port owners via `netstat`.
-
+// Windows uses a native process handle for identity and lifecycle checks.
+// tasklist CSV output is localized, can truncate image names, and does not
+// expose a reliable process creation time.
 const (
-	createNewProcessGroup = 0x00000200
-	detachedProcess       = 0x00000008
+    createNewProcessGroup = 0x00000200
+    detachedProcess = 0x00000008
+    windowsStillActive = 259
 )
 
 func configureDaemonProcess(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: createNewProcessGroup | detachedProcess,
-	}
+    cmd.SysProcAttr = &syscall.SysProcAttr{
+        CreationFlags: createNewProcessGroup | detachedProcess,
+    }
 }
 
-func processAlive(pid int) (bool, error) {
-	line, err := tasklistLine(pid)
-	if err != nil {
-		return false, nil
-	}
-	return line != "", nil
+func openDaemonProcess(pid int) (windows.Handle,error) {
+    if pid < 1 { return 0, errors.New("invalid Windows process PID") }
+    return windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 }
 
-// tasklistLine returns the CSV row for a pid, or "" when it is not running.
-func tasklistLine(pid int) (string, error) {
-	out, err := exec.Command("tasklist", "/FI", "PID eq "+strconv.Itoa(pid), "/FO", "CSV", "/NH").Output()
-	if err != nil {
-		return "", err
-	}
-	s := strings.TrimSpace(string(out))
-	// When nothing matches, tasklist prints an INFO line rather than a CSV row.
-	if s == "" || strings.HasPrefix(s, "INFO:") {
-		return "", nil
-	}
-	return s, nil
+func processAlive(pid int) (bool,error) {
+    h,err:=openDaemonProcess(pid)
+    if err!=nil { return false,nil }
+    defer windows.CloseHandle(h)
+    var code uint32
+    if err:=windows.GetExitCodeProcess(h,&code);err!=nil {return false,err}
+    return code==windowsStillActive,nil
 }
 
-func processStartTime(pid int) (string, error) {
-	// tasklist does not expose start time cheaply; the image name is a stable
-	// enough identity token for PID-reuse detection alongside the alive check.
-	line, err := tasklistLine(pid)
-	if err != nil || line == "" {
-		return "", errors.New("no such process")
-	}
-	if fields := strings.SplitN(strings.Trim(line, "\""), "\",\"", 2); len(fields) > 0 {
-		return fields[0], nil
-	}
-	return line, nil
+func processStartTime(pid int) (string,error) {
+    h,err:=openDaemonProcess(pid)
+    if err!=nil{return "",err}
+    defer windows.CloseHandle(h)
+    var created,exited,kernel,user windows.Filetime
+    if err:=windows.GetProcessTimes(h,&created,&exited,&kernel,&user);err!=nil{return "",err}
+    // Stable 100 ns units since Windows FILETIME epoch. This distinguishes
+    // PID reuse, unlike tasklist's executable-name-only placeholder.
+    stamp:=(uint64(created.HighDateTime)<<32)|uint64(created.LowDateTime)
+    if stamp==0{return "",errors.New("missing Windows process creation time")}
+    return strconv.FormatUint(stamp,10),nil
 }
 
-func processExecutable(pid int) (string, error) {
-	line, err := tasklistLine(pid)
-	if err != nil || line == "" {
-		return "", errors.New("no such process")
-	}
-	fields := strings.SplitN(strings.Trim(line, "\""), "\",\"", 2)
-	if len(fields) > 0 {
-		return fields[0], nil // image name
-	}
-	return "", errors.New("could not read process image")
+func processExecutable(pid int) (string,error) {
+    h,err:=openDaemonProcess(pid)
+    if err!=nil{return "",err}
+    defer windows.CloseHandle(h)
+    // Win32 path, not an NT device path; matches os.Executable semantics.
+    path:=make([]uint16,32768)
+    n:=uint32(len(path))
+    if err:=windows.QueryFullProcessImageName(h,0,&path[0],&n);err!=nil{return "",err}
+    if n<1||int(n)>len(path){return "",errors.New("empty Windows process image path")}
+    return windows.UTF16ToString(path[:n]),nil
 }
 
-func processArguments(_ int) ([]string, error) {
-	// Command-line arguments are not readily available via tasklist; identity is
-	// established via the image name and the PID-file state instead.
-	return nil, nil
+func processArguments(_ int) ([]string,error) {
+    // The daemon starter records the PID and exact executable path; the
+    // verifier checks those plus creation time. Cross-process command-line
+    // inspection is not needed for managed process identity on Windows.
+    return nil,nil
 }
 
-func processOwnerUID(_ int) (int, error) {
-	// Windows has no numeric UID; ownership is not enforced here.
-	return 0, nil
+func processOwnerUID(_ int) (int,error) {
+    // Windows ownership is not represented as a POSIX UID.
+    return 0,nil
 }
 
-func processesListeningOnPort(port int) ([]int, error) {
-	out, err := exec.Command("netstat", "-ano", "-p", "TCP").Output()
-	if err != nil {
-		return nil, nil
-	}
-	want := ":" + strconv.Itoa(port)
-	seen := map[int]bool{}
-	var pids []int
-	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 5 || !strings.EqualFold(fields[3], "LISTENING") {
-			continue
-		}
-		if !strings.HasSuffix(fields[1], want) {
-			continue
-		}
-		if pid, convErr := strconv.Atoi(fields[4]); convErr == nil && !seen[pid] {
-			seen[pid] = true
-			pids = append(pids, pid)
-		}
-	}
-	return pids, nil
+func processesListeningOnPort(port int) ([]int,error) {
+    // netstat is only a supplementary port-owner test. Process identity is
+    // verified above with native handles, not with netstat's text.
+    out,err:=exec.Command("netstat","-ano","-p","TCP").Output()
+    if err!=nil{return nil,err}
+    want:=":"+strconv.Itoa(port)
+    seen:=map[int]bool{}
+    var pids []int
+    for _,line:=range strings.Split(string(out),"\n"){
+        fields:=strings.Fields(line)
+        if len(fields)<5||!strings.EqualFold(fields[3],"LISTENING"){continue}
+        if !strings.HasSuffix(fields[1],want){continue}
+        if pid,e:=strconv.Atoi(fields[4]);e==nil&&!seen[pid]{
+            seen[pid]=true
+            pids=append(pids,pid)
+        }
+    }
+    return pids,nil
 }
 
-func daemonTargetAlive(pid int, _ bool) (bool, error) { return processAlive(pid) }
-
-func terminateDaemonProcess(proc *os.Process, _ bool) error {
-	// No POSIX signals; taskkill terminates the process tree.
-	return exec.Command("taskkill", "/PID", strconv.Itoa(proc.Pid), "/T").Run()
+func daemonTargetAlive(pid int,_ bool)(bool,error){return processAlive(pid)}
+func terminateDaemonProcess(proc *os.Process,_ bool)error{
+    return exec.Command("taskkill","/PID",strconv.Itoa(proc.Pid),"/T").Run()
 }
-
-func killDaemonProcess(proc *os.Process, _ bool) error {
-	return exec.Command("taskkill", "/PID", strconv.Itoa(proc.Pid), "/T", "/F").Run()
+func killDaemonProcess(proc *os.Process,_ bool)error{
+    return exec.Command("taskkill","/PID",strconv.Itoa(proc.Pid),"/T","/F").Run()
 }
