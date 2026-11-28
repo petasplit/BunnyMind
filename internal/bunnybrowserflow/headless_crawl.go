@@ -131,16 +131,16 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
   Pages:[]HeadlessPage{},Endpoints:[]HeadlessEndpoint{},EncryptedCaptures:[]bunnyartifact.Receipt{},
   Limitation:"Passive DOM and JavaScript endpoint references plus CDP network metadata; these are candidates, not verified vulnerabilities. No forms or controls are triggered in crawl phase.",
  }
- type item struct{URL string;Depth int}
- queued:=[]item{{URL:cfg.Origin+cfg.StartPath,Depth:0}}
+ type queueItem struct{URL string;Depth int}
+ queued:=[]queueItem{{URL:cfg.Origin+cfg.StartPath,Depth:0}}
  seenPages:=map[string]bool{}
  seenEndpoints:=map[string]bool{}
  for len(queued)>0&&len(report.Pages)<cfg.MaxPages{
   if err:=ctx.Err();err!=nil{return report,err}
-  item:=queued[0];queued=queued[1:]
-  if seenPages[item.URL]{continue}
-  seenPages[item.URL]=true
-  if err:=d.Navigate(ctx,item.URL);err!=nil{
+  current:=queued[0];queued=queued[1:]
+  if seenPages[current.URL]{continue}
+  seenPages[current.URL]=true
+  if err:=d.Navigate(ctx,current.URL);err!=nil{
    report.StopReason="navigation_failed"
    return report,fmt.Errorf("headless navigation did not complete: %w",err)
   }
@@ -176,7 +176,7 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
    if err!=nil{return report,errors.New("encrypted Chromium HTTP evidence unavailable")}
    if receipt.File!=""{report.EncryptedCaptures=append(report.EncryptedCaptures,receipt)}
   }
-  if item.Depth<cfg.MaxDepth{
+  if current.Depth<cfg.MaxDepth{
    for _,href:=range discovery.Links{
     safe,ok:=safeDiscoveryPath(cfg.Origin,href)
     if !ok{continue}
@@ -186,7 +186,7 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
     }
     one.DiscoveredLinks++
     appendEndpoint(&report,seenEndpoints,cfg.Origin,safe,"GET","dom_link")
-    if !seenPages[safe]&&len(queued)<48{queued=append(queued,item{URL:safe,Depth:item.Depth+1})}
+    if !seenPages[safe]&&len(queued)<48{queued=append(queued,queueItem{URL:safe,Depth:current.Depth+1})}
    }
   }
   for _,v:=range discovery.ScriptURLs{appendEndpoint(&report,seenEndpoints,cfg.Origin,v,"GET","script_src")}
