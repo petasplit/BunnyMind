@@ -21,6 +21,7 @@ import (
  "github.com/enowdev/antares/internal/bunnyartifact"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyjsruntime"
  "github.com/enowdev/antares/internal/bunnyquota"
 )
 
@@ -42,6 +43,8 @@ type HeadlessPage struct {
  DiscoveredLinks int `json:"discovered_links"`
  ObservedRequests int `json:"observed_requests"`
  ScriptBodiesInspected int `json:"script_bodies_inspected"`
+ ASTAnalyzedScripts int `json:"ast_analyzed_scripts"`
+ ASTOriginalAttributions int `json:"ast_original_attributions"`
 }
 type HeadlessReport struct {
  EngagementID string `json:"engagement_id"`
@@ -154,9 +157,25 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
   discovery,err:=parseDiscovery(raw)
   if err!=nil{return report,err}
   one:=HeadlessPage{Path:cleanedPath(actual)}
-  for _,v:=range discovery.InlineScripts{
-   for _,found:=range scriptEndpoints(v,cfg.Origin,40){appendEndpoint(&report,seenEndpoints,cfg.Origin,found,"OBSERVED","inline_js_candidate")}
+  inspectScript:=func(code,source string){
+   // Prefer the bundled TypeScript AST parser. It does not execute code,
+   // infer dynamic template values or export source text. The legacy regex
+   // inventory remains an explicitly labeled fallback when unavailable.
+   if bunnyjsruntime.Available(){
+    if result,e:=bunnyjsruntime.Analyze(ctx,cfg.Origin,code);e==nil{
+     one.ASTAnalyzedScripts++
+     one.ASTOriginalAttributions+=result.SourceMap.Attributed
+     for _,endpoint:=range result.Endpoints{
+      appendEndpoint(&report,seenEndpoints,cfg.Origin,cfg.Origin+endpoint.Path,endpoint.Method,"ast_"+source)
+     }
+     return
+    }
+   }
+   for _,found:=range scriptEndpoints(code,cfg.Origin,40){
+    appendEndpoint(&report,seenEndpoints,cfg.Origin,found,"OBSERVED",source+"_regex_fallback")
+   }
   }
+  for _,v:=range discovery.InlineScripts{inspectScript(v,"inline_js")}
   for _,v:=range discovery.ObservedResources{
    appendEndpoint(&report,seenEndpoints,cfg.Origin,v,"OBSERVED","performance_resource")
   }
@@ -172,7 +191,7 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
    script,ok:=scriptFromBody(src,kind)
    if !ok{continue}
    one.ScriptBodiesInspected++
-   for _,found:=range scriptEndpoints(script,cfg.Origin,40){appendEndpoint(&report,seenEndpoints,cfg.Origin,found,"OBSERVED","script_body_candidate")}
+   inspectScript(script,"script_body")
   }
   if capture!=nil{
    receipt,err:=capture(ctx,len(report.Pages)+1,requests)
