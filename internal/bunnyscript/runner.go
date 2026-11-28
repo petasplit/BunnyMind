@@ -17,6 +17,7 @@ import (
 
  "github.com/enowdev/antares/internal/bunnyartifact"
  "github.com/enowdev/antares/internal/bunnyaudit"
+ "github.com/enowdev/antares/internal/bunnyjudge"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnyquota"
@@ -231,6 +232,16 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  // Bind the script, plan, reports, and encrypted transcript to an authenticated seal.
  if _,err:=bunnyaudit.SealRun(dir,runner.EncryptionKey);err!=nil{
   return EvidenceSummary{},fmt.Errorf("evidence integrity sealing failed: %w",err)
+ }
+ // A separately implemented second parser reopens the actual ciphertext,
+ // checks every request/response and control against the sealed plan, and
+ // encrypts its own verdict. No marker may be promoted to security impact.
+ independent,err:=bunnyjudge.JudgeRun(dir,runner.EncryptionKey)
+ if err!=nil{return EvidenceSummary{},fmt.Errorf("independent evidence review failed: %w",err)}
+ verdictRaw,err:=json.MarshalIndent(independent,"","  ")
+ if err!=nil{return EvidenceSummary{},err}
+ if _,err:=bunnyartifact.Store(dir,"independent-judge","judge_verdict",verdictRaw,runner.EncryptionKey);err!=nil{
+  return EvidenceSummary{},fmt.Errorf("private judge verdict could not be stored: %w",err)
  }
  return summary,nil
 }
