@@ -261,7 +261,7 @@ var Toolsets = map[string][]string{
 		"terminal", "process", "todo", "board", "project_info", "set_soul", "skill", "delegate_task", "task", "list_roles", "diagnostics", "http_request", "ask_user", "schedule",
 	},
 	"research": {
-		"read_file", "read_document", "program_intake", "web_search", "web_fetch", "http_request", "browser", "grep", "todo", "memory",
+		"read_file", "read_document", "program_intake", "passive_subdomains", "web_search", "web_fetch", "http_request", "browser", "grep", "todo", "memory",
 		"session_search", "rag_search", "skill", "view_image", "report_finding", "add_intel", "methodology_status",
 		"delegate_task", "task", "list_roles",
 	},
@@ -269,7 +269,7 @@ var Toolsets = map[string][]string{
 	"security": {
 		"read_file", "write_file", "list_files", "glob", "grep", "terminal", "process",
 		"web_search", "web_fetch", "http_request", "browser", "todo", "skill",
-		"review_evidence", "program_intake", "scoped_read", "investigation_board", "inventory_graph", "engagement_blackboard", "verify_lab_receipts", "assess_authz_receipts", "compare_authz_fix_receipts", "compare_build_bound_fix", "auth_workflow_lab", "research_next_step", "exploration_timeline", "har_context_inventory", "auth_access_matrix", "auth_browser_lab", "approved_browser_auth", "finding_focus", "engagement_profile", "python_proof_run", "python_adaptive_proof_run", "python_hypothesis_draft", "report_finding", "triage_finding", "add_intel", "methodology_status",
+		"review_evidence", "program_intake", "passive_subdomains", "scoped_read", "investigation_board", "inventory_graph", "engagement_blackboard", "verify_lab_receipts", "assess_authz_receipts", "compare_authz_fix_receipts", "compare_build_bound_fix", "auth_workflow_lab", "research_next_step", "exploration_timeline", "har_context_inventory", "auth_access_matrix", "auth_browser_lab", "approved_browser_auth", "finding_focus", "engagement_profile", "python_proof_run", "python_adaptive_proof_run", "python_hypothesis_draft", "report_finding", "triage_finding", "add_intel", "methodology_status",
 		"delegate_task", "task", "list_roles", "diagnostics", "ask_user", "vps_run", "vps_upload", "vps_download",
 		"osint_dns", "osint_dorks", "osint_whois", "osint_ip", "osint_username", "osint_github", "osint_email", "osint_email_full", "list_proxies", "osint_breach", "osint_shodan", "osint_reputation", "osint_crypto", "osint_domain", "osint_phone", "osint_scrape", "osint_paste", "osint_footprint", "osint_pivot", "osint_google", "osint_dorks_live", "check_dependencies", "re_info", "re_strings", "re_analyze", "re_decompile", "solve_captcha", "intercept",
 		"attack_script", "awshook", "azurehook", "kubehook", "winhook", "machook", "cipipe", "ebpf",
