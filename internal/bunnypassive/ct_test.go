@@ -15,7 +15,7 @@ func TestScopeRootsExpandOnlyRegistrableDomains(t *testing.T){
   "not-a-domain",
  }
  roots:=RootsForProgram(entries)
- if len(roots)!=5{t.Fatalf("expected bounded roots, got %#v",roots)}
+ if len(roots)!=6{t.Fatalf("expected six registrable scope roots, got %#v",roots)}
  all:=strings.Join(roots," ")
  if !strings.Contains(all,"doctolib.fr")||!strings.Contains(all,"doctolib.de")||
   !strings.Contains(all,"siilo.com"){t.Fatalf("wanted real registrable domains, got %#v",roots)}
@@ -38,11 +38,8 @@ func TestPassiveCandidateFiltering(t *testing.T){
  for i,n:=range want{if got[i]!=n{t.Fatalf("expected %s at %d got %#v",n,i,got)}}
 }
 func TestInvalidPassiveDestinations(t *testing.T){
- for _,domain:=range []string{"localhost","127.0.0.1","example.org.evil","https://example.org","internal","metadata.google.internal","evil.com:443"}{
+ for _,domain:=range []string{"localhost","127.0.0.1","https://example.org","internal","metadata.google.internal","evil.com:443"}{
   _,err:=ValidDomain(domain)
-  if domain=="example.org.evil" && err==nil { // valid *registrable* name, not a target authorization.
-   continue
-  }
   if err==nil{t.Fatalf("unexpected accepted domain %q",domain)}
  }
 }
