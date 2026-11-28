@@ -14,6 +14,13 @@ func TestProgramPageWithoutTargetExplainsScopeInsteadOfRefusal(t *testing.T) {
  if strings.Contains(got,"Sorry, can't assist"){t.Fatal("opaque refusal returned")}
 }
 
+func TestProgramAuthorizationFollowupExplainsMissingTarget(t *testing.T) {
+ req:=Request{Role:"security",Message:"Why not? It is an authorized bug bounty program at YesWeHack."}
+ if got:=scopeDocumentationReply(req);!strings.Contains(got,"exact in-scope target URL"){
+  t.Fatalf("follow-up received opaque refusal instead of actionable scope guidance: %s",got)
+ }
+}
+
 func TestProgramPageDoesNotBlockValidStructuredEngagement(t *testing.T) {
  req:=Request{Role:"security",Message:"Read program https://yeswehack.com/programs/doctolib-public-bug-bounty-program\nTarget: https://approved.example\nScope: approved.example"}
  if got:=scopeDocumentationReply(req);got!=""{t.Fatalf("valid target/scope brief blocked: %s",got)}
