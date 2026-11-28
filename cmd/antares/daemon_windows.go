@@ -101,8 +101,11 @@ func processesListeningOnPort(port int) ([]int,error) {
 
 func daemonTargetAlive(pid int,_ bool)(bool,error){return processAlive(pid)}
 func terminateDaemonProcess(proc *os.Process,_ bool)error{
-    return exec.Command("taskkill","/PID",strconv.Itoa(proc.Pid),"/T").Run()
+    // DETACHED_PROCESS has no console to receive Ctrl+C.
+    // taskkill /T can fail for a detached process on Windows. Use the
+    // native process termination API on the tracked PID instead.
+    return proc.Kill()
 }
 func killDaemonProcess(proc *os.Process,_ bool)error{
-    return exec.Command("taskkill","/PID",strconv.Itoa(proc.Pid),"/T","/F").Run()
+    return proc.Kill()
 }
