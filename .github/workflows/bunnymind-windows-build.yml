@@ -51,7 +51,8 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-program-intake-windows-x64.exe ./cmd/bunny-program-intake
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-scoped-crawl-windows-x64.exe ./cmd/bunny-scoped-crawl
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-headless-crawl-windows-x64.exe ./cmd/bunny-headless-crawl
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe BunnyMind-headless-crawl-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-approved-auth-windows-x64.exe ./cmd/bunny-approved-auth
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe BunnyMind-headless-crawl-windows-x64.exe BunnyMind-approved-auth-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -66,6 +67,7 @@ jobs:
             dist/BunnyMind-program-intake-windows-x64.exe
             dist/BunnyMind-scoped-crawl-windows-x64.exe
             dist/BunnyMind-headless-crawl-windows-x64.exe
+            dist/BunnyMind-approved-auth-windows-x64.exe
             dist/SHA256SUMS.txt
             dist/CHAT_CHUNKS.txt
           retention-days: 7
