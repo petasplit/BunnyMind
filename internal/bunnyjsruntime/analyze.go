@@ -6,6 +6,8 @@ package bunnyjsruntime
 import (
  "bytes"
  "context"
+ "crypto/sha256"
+ "encoding/hex"
  "encoding/json"
  "errors"
  "fmt"
@@ -88,13 +90,13 @@ type limited struct{
  overflow bool
 }
 func (l *limited)Write(p []byte)(int,error){
- if l.data.Len()<l.max{
-  count:=l.max-l.data.Len()
-  if count>len(p){count=len(p)}
-  _,_=l.data.Write(p[:count])
- }
- if l.data.Len()>=l.max{l.overflow=true}
- return len(p),nil
+ old:=len(p)
+ room:=l.max-l.data.Len()
+ if room<0{room=0}
+ if room<len(p){l.overflow=true}
+ if room>len(p){room=len(p)}
+ if room>0{_,_=l.data.Write(p[:room])}
+ return old,nil
 }
 func Analyze(ctx context.Context,origin,source string)(Report,error){
  parsed,err:=url.Parse(origin)
@@ -129,5 +131,7 @@ func Analyze(ctx context.Context,origin,source string)(Report,error){
  dec.DisallowUnknownFields()
  if err:=dec.Decode(&report);err!=nil{return Report{},err}
  if err:=Valid(report,parsed.Scheme+"://"+parsed.Host);err!=nil{return Report{},err}
+ actual:=sha256.Sum256([]byte(source))
+ if report.SourceSHA256!=hex.EncodeToString(actual[:]){return Report{},errors.New("AST report source hash differs from input")}
  return report,nil
 }
