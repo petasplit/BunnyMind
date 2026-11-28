@@ -89,6 +89,7 @@ export function ProjectSidebar({
   const [tab, setTab] = useState<Tab>('info')
 
   useEffect(() => {
+    setInfo(null)
     if (sessionId) {
       let alive = true
       get<SessionResp>(`/sessions/${sessionId}`)
@@ -103,6 +104,7 @@ export function ProjectSidebar({
 
   useEffect(() => {
     let alive = true
+    setPlan(null)
     get<PlanResp>(`/project/plan?dir=${encodeURIComponent(projectDir)}`)
       .then((d) => alive && setPlan(d))
       .catch(() => {})
@@ -157,7 +159,8 @@ export function ProjectSidebar({
         onWheel={(e) => {
           // Trackpads already send horizontal delta; a plain wheel only sends
           // vertical — translate it so the row scrolls sideways either way.
-          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          if (e.currentTarget.scrollWidth > e.currentTarget.clientWidth &&
+              Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
             e.currentTarget.scrollLeft += e.deltaY
           }
         }}
