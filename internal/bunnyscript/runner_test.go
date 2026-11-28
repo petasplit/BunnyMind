@@ -39,6 +39,7 @@ func scriptFixture(t *testing.T)(Plan,bunnyguard.Policy,func()){
  return p,policy,server.Close
 }
 func TestGeneratedScriptExecutableAndFullProofSaved(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  python,err:=exec.LookPath("python3")
  if err!=nil{python,err=exec.LookPath("python")}
  if err!=nil{t.Skip("Python 3 interpreter not installed")}
