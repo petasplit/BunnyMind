@@ -142,9 +142,11 @@ func (s *Session) Start(ctx context.Context) error {
 			"--window-size=" + strconv.Itoa(s.opts.Width) + "," + strconv.Itoa(s.opts.Height),
 			"about:blank",
 		}
-		// Local root-owned Linux fixtures may need no-sandbox in a container.
-		// External authorized browser assessments must retain sandboxing.
-		if runtime.GOOS=="linux" && os.Geteuid()==0 && !scoped {
+		// Disposable Linux loopback fixtures run inside CI/container
+		// sandboxes that may deny Chrome's nested process sandbox even as
+		// an unprivileged user. Retain that exception *only* for numeric
+		// loopback fixtures, never for real scoped external browsing.
+		if runtime.GOOS=="linux" && s.opts.LoopbackOrigin!="" && !scoped {
 			args=append(args,"--no-sandbox")
 		}
 		if scoped {
