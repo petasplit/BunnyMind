@@ -149,10 +149,10 @@ func Run(ctx context.Context,p Plan,guard bunnyguard.Policy,evidenceRoot string)
  // One active crawler at a time for a given engagement/evidence root. Shared
  // worst-case reservation prevents the Python proof campaign from silently
  // consuming an overlapping budget when it uses the same directory.
- release,err:=bunnyquota.ExecutionLease(ctx,evidenceRoot,p.EngagementID)
+ release,err:=bunnyquota.ExecutionLeaseShared(ctx,p.EngagementID)
  if err!=nil{return Summary{},err}
  defer release()
- if _,err:=bunnyquota.Reserve(ctx,evidenceRoot,p.EngagementID,p.MaxPages,guard.MaxNetworkCalls);err!=nil{return Summary{},err}
+ if _,err:=bunnyquota.ReserveShared(ctx,p.EngagementID,p.MaxPages,guard.MaxNetworkCalls);err!=nil{return Summary{},err}
  begun:=time.Now().UTC()
  out:=Summary{EngagementID:p.EngagementID,SeedOrigin:rootOrigin,
   StartedUTC:begun.Format(time.RFC3339Nano),Pages:[]Page{},DiscoveredPaths:[]string{},
