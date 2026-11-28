@@ -40,11 +40,15 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p dist
+          find web/dist/assets -maxdepth 1 -name 'ChatPage-*.js' -printf '%f\n' > dist/CHAT_CHUNKS.txt
+          test -s dist/CHAT_CHUNKS.txt
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authz-demo-windows-x64.exe ./cmd/bunnyauthz-demo
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-fix-demo-windows-x64.exe ./cmd/bunnyfix-demo
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authflow-demo-windows-x64.exe ./cmd/bunny-authflow-demo
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-python-proof-windows-x64.exe ./cmd/bunny-python-proof
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-adaptive-proof-windows-x64.exe ./cmd/bunny-adaptive-proof
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -54,18 +58,145 @@ jobs:
             dist/BunnyMind-authz-demo-windows-x64.exe
             dist/BunnyMind-fix-demo-windows-x64.exe
             dist/BunnyMind-authflow-demo-windows-x64.exe
+            dist/BunnyMind-python-proof-windows-x64.exe
+            dist/BunnyMind-adaptive-proof-windows-x64.exe
             dist/SHA256SUMS.txt
+            dist/CHAT_CHUNKS.txt
           retention-days: 7
 
   windows-native-smoke:
     needs: windows-x64
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Download compiled Windows executables
         uses: actions/download-artifact@v4
         with:
           name: BunnyMind-windows-x64-ci
           path: dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run native Windows adaptive Python evidence, keyring and seal integration smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = (Get-Command python).Source
+          $guard = Join-Path $PWD 'tests/fixtures/guard-loopback.json'
+          $spec = Join-Path $PWD 'tests/fixtures/adaptive-loopback.json'
+          $serverSource = Join-Path $PWD 'tests/fixtures/bunnymind_local_fixture.py'
+          $proofExe = Join-Path $PWD 'dist/BunnyMind-python-proof-windows-x64.exe'
+          $adaptiveExe = Join-Path $PWD 'dist/BunnyMind-adaptive-proof-windows-x64.exe'
+          $vault = Join-Path $env:RUNNER_TEMP 'bunnymind-python-vault'
+          $srv = Start-Process -FilePath $python -ArgumentList @('-u', $serverSource, '--port', '18786') -PassThru
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 40; $i++) {
+              if ($srv.HasExited) { throw 'Local Python fixture stopped before verification' }
+              try {
+                $health = Invoke-WebRequest -Uri 'http://127.0.0.1:18786/health' -UseBasicParsing -TimeoutSec 2
+                if ($health.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $ready) { throw 'Local fixture did not become healthy' }
+            & $proofExe --init-key
+            if ($LASTEXITCODE -ne 0) { throw 'Evidence encryption key enrollment failed on Windows' }
+            $raw = & $adaptiveExe --guard $guard --spec $spec --out $vault --python $python
+            if ($LASTEXITCODE -ne 0) { throw 'Native Windows adaptive proof runner failed' }
+            $campaign = ($raw -join "`n") | ConvertFrom-Json
+            if ($campaign.outcome -ne 'replicated_observation_unverified' -or
+                $campaign.requests_used -ne 12 -or $campaign.runs.Count -ne 3) {
+              throw 'Adaptive proof fixture did not repeat the expected controlled response with negative controls'
+            }
+            foreach ($run in $campaign.runs) {
+              $round = Join-Path (Join-Path $vault 'bunnymindlocal01') $run.run_id
+              foreach ($name in @('scenario.py', 'plan.json', 'validation.json', 'transcript.enc', 'seal.json')) {
+                if (-not (Test-Path (Join-Path $round $name))) { throw "Missing sealed proof artifact: $($run.run_id)/$name" }
+              }
+            }
+            Write-Host 'PASS: Windows keyring, Python 3, adaptive HTTP controls, generated scripts, encrypted evidence and audit seals'
+          } finally {
+            if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
+          }
+      - name: Launch actual BunnyMind Windows server and verify embedded dashboard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'dist/BunnyMind-windows-x64.exe'
+          if (-not (Test-Path $exe)) { throw 'Main BunnyMind executable is missing' }
+          $version = (& $exe version | Out-String)
+          if ($LASTEXITCODE -ne 0 -or -not $version.Trim()) { throw 'Main executable version command failed' }
+          $helpText = (& $exe help | Out-String)
+          if ($LASTEXITCODE -ne 0 -or -not $helpText.Contains('setup')) { throw 'Main executable help command failed' }
+          $env:ANTARES_HOME = Join-Path $env:RUNNER_TEMP 'bunnymind-native-smoke-home'
+          $env:ANTARES_HOST = '127.0.0.1'
+          $env:ANTARES_PORT = '18787'
+          $env:ANTARES_DISABLE_MODELS_FETCH = '1'
+          $outFile = Join-Path $env:RUNNER_TEMP 'bunnymind-main-stdout.log'
+          $errFile = Join-Path $env:RUNNER_TEMP 'bunnymind-main-stderr.log'
+          $process = Start-Process -FilePath $exe -ArgumentList '--foreground' -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if ($process.HasExited) { throw 'Main BunnyMind process exited before health check' }
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:18787/api/health' -TimeoutSec 2
+                if ($health.ok -eq $true) { $healthy = $true; break }
+              } catch { }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $healthy) {
+              Get-Content $outFile -ErrorAction SilentlyContinue | Select-Object -Last 20
+              Get-Content $errFile -ErrorAction SilentlyContinue | Select-Object -Last 20
+              throw 'Main server never became healthy'
+            }
+            $dashboard = Invoke-WebRequest -Uri 'http://127.0.0.1:18787/' -UseBasicParsing -TimeoutSec 10
+            if ($dashboard.StatusCode -ne 200 -or -not $dashboard.Content) {
+              throw 'Embedded web dashboard was not served successfully'
+            }
+            $chunks = @(Get-Content (Join-Path $PWD 'dist/CHAT_CHUNKS.txt') | Where-Object { $_.Trim() })
+            if ($chunks.Count -lt 1) { throw 'No ChatPage dynamic-import chunks in Windows build' }
+            foreach ($chunk in $chunks) {
+              $asset = Invoke-WebRequest -Uri ("http://127.0.0.1:18787/assets/" + $chunk) -UseBasicParsing -TimeoutSec 15
+              if ($asset.StatusCode -ne 200 -or
+                  $asset.Headers['Content-Type'] -notmatch 'javascript' -or
+                  $asset.Content -match '<!doctype html>') {
+                throw "ChatPage asset $chunk was not served as a JavaScript module"
+              }
+            }
+            $staleAsset = Invoke-WebRequest -Uri 'http://127.0.0.1:18787/assets/ChatPage-nonexistent.js' -UseBasicParsing -SkipHttpErrorCheck -TimeoutSec 15
+            if ($staleAsset.StatusCode -ne 404 -or $staleAsset.Content -match '<!doctype html>') {
+              throw 'A missing hashed JavaScript module was incorrectly replaced by SPA HTML'
+            }
+            Write-Host 'PASS: Actual Windows x64 backend started, served healthy API, embedded dashboard and dynamic ChatPage JavaScript chunks'
+
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+      - name: Start and stop the actual BunnyMind Windows background daemon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'dist/BunnyMind-windows-x64.exe'
+          $env:ANTARES_HOME = Join-Path $env:RUNNER_TEMP 'bunnymind-daemon-smoke-home'
+          $env:ANTARES_HOST = '127.0.0.1'
+          $env:ANTARES_PORT = '18788'
+          $env:ANTARES_DISABLE_MODELS_FETCH = '1'
+          & $exe serve
+          if ($LASTEXITCODE -ne 0) { throw 'Windows background daemon failed to start' }
+          try {
+            $status = (& $exe status | Out-String)
+            if ($LASTEXITCODE -ne 0 -or $status -notmatch 'running') {
+              throw 'Windows process identity check rejected a running daemon'
+            }
+            $health = Invoke-RestMethod -Uri 'http://127.0.0.1:18788/api/health' -TimeoutSec 8
+            if ($health.ok -ne $true) { throw 'Windows daemon did not serve the health endpoint' }
+            Write-Host 'PASS: Windows background daemon process identity, status command and API health'
+          } finally {
+            & $exe stop
+            if ($LASTEXITCODE -ne 0) { throw 'Windows daemon stop failed' }
+          }
       - name: Run secure and deliberately vulnerable localhost scenarios
         shell: pwsh
         run: |

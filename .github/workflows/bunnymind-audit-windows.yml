@@ -1,0 +1,40 @@
+name: BunnyMind Evidence Auditor Windows x64
+on:
+  push:
+    branches: [main, "bunnymind/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run evidence audit tests on Windows
+        shell: pwsh
+        run: |
+          go test ./internal/bunnyaudit ./cmd/bunny-audit -count=1 -v
+      - name: Build standalone BunnyMind evidence verifier
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -ldflags="-s -w" -o dist/bunny-audit-windows-amd64.exe ./cmd/bunny-audit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $hash = (Get-FileHash dist/bunny-audit-windows-amd64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  bunny-audit-windows-amd64.exe" | Out-File -Encoding ascii dist/SHA256SUMS.txt
+      - name: Upload Windows x64 evidence verifier with checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: bunnymind-evidence-audit-win-x64
+          path: |
+            dist/bunny-audit-windows-amd64.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+ "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -333,18 +334,32 @@ func validateDaemonState(state daemonState) (bool, error) {
 	if state.StartTime != "" && start != state.StartTime {
 		return false, nil // PID has been reused.
 	}
-	owner, err := processOwnerUID(state.PID)
-	if err != nil {
-		return false, err
-	}
-	if owner != os.Getuid() {
-		return false, nil
+	// Unix daemon ownership is verified by numeric UID. Windows has no
+	// numeric POSIX UID (os.Getuid() always returns -1), so comparing it
+	// against a fake Windows UID rejects every otherwise healthy daemon.
+	// On Windows require the exact PID, native process creation timestamp,
+	// full executable path, and port/health checks instead.
+	if runtime.GOOS != "windows" {
+		owner, err := processOwnerUID(state.PID)
+		if err != nil {
+			return false, err
+		}
+		if owner != os.Getuid() {
+			return false, nil
+		}
 	}
 	exe, err := processExecutable(state.PID)
 	if err != nil {
 		return false, err
 	}
 	wantExe, _ := filepath.EvalSymlinks(state.Exe)
+	if runtime.GOOS == "windows" {
+		// QueryFullProcessImageName provides the full, non-truncated Win32
+		// path and GetProcessTimes provides a PID-reuse-resistant creation
+		// timestamp. Managed Windows processes do not need argv inspection.
+		// waitDaemonReady also checks actual port ownership and API health.
+		return strings.EqualFold(filepath.Clean(exe), filepath.Clean(wantExe)), nil
+	}
 	if exe != wantExe {
 		return false, nil
 	}

@@ -1,0 +1,12 @@
+{
+  "engagement_id": "bunny-local-fixture",
+  "allowed_origins": [
+    "http://127.0.0.1:18786"
+  ],
+  "allowed_methods": [
+    "GET",
+    "HEAD"
+  ],
+  "max_network_calls": 48,
+  "min_interval_ms": 100
+}
