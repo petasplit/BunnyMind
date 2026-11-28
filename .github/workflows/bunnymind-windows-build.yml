@@ -123,6 +123,40 @@ jobs:
           } finally {
             if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
           }
+      - name: Verify Windows scoped crawler against a disposable localhost fixture
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = (Get-Command python).Source
+          $fixture = Join-Path $PWD 'tests/fixtures/bunnymind_local_fixture.py'
+          $guard = Join-Path $PWD 'tests/fixtures/guard-loopback.json'
+          $exe = Join-Path $PWD 'dist/BunnyMind-scoped-crawl-windows-x64.exe'
+          if (-not (Test-Path $exe)) { throw 'Scoped crawler Windows EXE missing' }
+          $root = Join-Path $env:RUNNER_TEMP 'bunnymind-crawler-native'
+          $srv = Start-Process -FilePath $python -ArgumentList @('-u',$fixture,'--port','18786') -PassThru
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 40; $i++) {
+              try {
+                $res = Invoke-WebRequest 'http://127.0.0.1:18786/health' -UseBasicParsing -TimeoutSec 2
+                if ($res.StatusCode -eq 200) { $ready=$true; break }
+              } catch { }
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $ready) { throw 'Crawler fixture failed to start' }
+            $raw = & $exe --guard $guard --url 'http://127.0.0.1:18786/health' --max-pages 2 --depth 1 --out $root
+            if ($LASTEXITCODE -ne 0) { throw 'Scoped crawler EXE exited unsuccessfully' }
+            $report = ($raw -join "`n") | ConvertFrom-Json
+            if ($report.requests_used -ne 1 -or $report.pages.Count -ne 1 -or
+                $report.pages[0].status -ne 200 -or $report.stop_reason -ne 'frontier_exhausted') {
+              throw 'Unexpected crawler result from disposable localhost fixture'
+            }
+            $receipts = @(Get-ChildItem $root -Filter 'crawl.json' -Recurse -ErrorAction SilentlyContinue)
+            if ($receipts.Count -ne 1) { throw 'Crawler did not preserve exactly one private receipt' }
+            Write-Host 'PASS: Windows crawler bounded GET, scope, local fixture and private evidence receipt'
+          } finally {
+            if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
+          }
       - name: Launch actual BunnyMind Windows server and verify embedded dashboard
         shell: pwsh
         run: |
