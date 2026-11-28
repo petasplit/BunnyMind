@@ -21,6 +21,7 @@ import {
   type SessionDetail,
 } from '@/lib/chatTranscript'
 import { useChatStream } from '@/lib/useChatStream'
+import { shouldFollowAfterScroll, shouldUnpinForWheel } from '@/lib/chatScrollPolicy'
 import type { LiveStatus, ForegroundRun } from '@/lib/chatStreamController'
 import { copyText } from '@/lib/clipboard'
 import { useI18n, type MessageKey } from '@/lib/i18n'
@@ -448,7 +449,7 @@ export default function ChatPage() {
       // Scrolling up with the wheel or keys unpins at once. The browser may
       // apply a wheel scroll before this handler runs; onScroll covers that.
       const onWheel = (e: WheelEvent) => {
-        if (e.deltaY < 0) stickRef.current = false
+        if (shouldUnpinForWheel(e.deltaY)) stickRef.current = false
       }
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'PageUp' || e.key === 'ArrowUp' || e.key === 'Home') stickRef.current = false
@@ -461,9 +462,14 @@ export default function ChatPage() {
           lastTop = top
           return
         }
-        const dist = el.scrollHeight - top - el.clientHeight
-        if (dist <= STICK_PX) stickRef.current = true
-        else if (top < lastTop - 1) stickRef.current = false
+        stickRef.current = shouldFollowAfterScroll({
+          top,
+          previousTop: lastTop,
+          scrollHeight: el.scrollHeight,
+          clientHeight: el.clientHeight,
+          stickThreshold: STICK_PX,
+          wasFollowing: stickRef.current,
+        })
         lastTop = top
       }
       // The composer growing, or the streaming indicator appearing, shrinks the
