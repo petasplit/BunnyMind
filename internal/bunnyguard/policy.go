@@ -195,6 +195,19 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
    origin="https://yeswehack.com"
    d=Decision{Allowed:true,Reason:"public program documentation fetch"}
   }
+ case "passive_subdomains":
+  network=true
+  var input struct{Domain string `json:"domain"`}
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&input);err!=nil{d.Reason="invalid passive CT arguments";break}
+  host:=strings.TrimSuffix(strings.ToLower(strings.TrimSpace(input.Domain)),".")
+  if len(host)<4||len(host)>170||strings.HasPrefix(host,"localhost")||
+   net.ParseIP(host)!=nil||strings.ContainsAny(host," /:@\\?#")||!strings.Contains(host,"."){
+   d.Reason="invalid passive CT domain"
+  }else{
+   origin="https://crt.sh"
+   d=Decision{Allowed:true,Reason:"public certificate transparency metadata"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
