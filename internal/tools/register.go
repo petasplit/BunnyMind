@@ -40,6 +40,7 @@ func init() {
 		authAccessMatrixTool{},
 		authBrowserLabTool{},
 		approvedBrowserAuthTool{},
+		approvedHeadlessCrawlTool{},
 		findingFocusTool{},
 		missionProfileTool{},
 		pythonProofRunTool{},
