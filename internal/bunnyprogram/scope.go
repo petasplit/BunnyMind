@@ -51,15 +51,32 @@ func addExact(seen map[string]bool,input string){
  if hostname=="apps.apple.com"||hostname=="play.google.com"{return}
  seen["https://"+hostname]=true
 }
-// ApprovedIntersection does not grant approval: it only intersects
-// independently configured manifest origins with finite program scope rows.
-// Any nonempty exclusions require review; the source program may exclude
-// categories (e.g. customer-specific hosts) that cannot be verified from DNS.
+// ApprovedIntersection intersects finite web entries with an independently
+// reviewed operator manifest. Exclusions are an additional denylist; program
+// hints NEVER create permissions beyond the manifest. Pattern-based policy
+// exceptions must still be reviewed by the operator before the manifest is set.
 func ApprovedIntersection(exact []string,operatorOrigins []string,exclusions []string)[]string{
- if len(exclusions)>0{return nil} // exclusions must be reconciled by operator
  allowed:=map[string]bool{}
  for _,item:=range operatorOrigins{allowed[strings.ToLower(strings.TrimSuffix(item,"/"))]=true}
  out:=[]string{}
- for _,o:=range exact{if allowed[o]{out=append(out,o)}}
+ for _,origin:=range exact{
+  if !allowed[origin]{continue}
+  u,err:=url.Parse(origin)
+  if err!=nil||u.Hostname()==""{continue}
+  host:=strings.ToLower(u.Hostname())
+  denied:=false
+  for _,raw:=range exclusions{
+   line:=strings.ToLower(raw)
+   if strings.Contains(line,host){denied=true;break}
+   // A program may abbreviate multi-TLD exclusions:
+   // community.doctolib.com | .fr | .de | .it
+   labels:=strings.Split(host,".")
+   if len(labels)==3&&strings.Contains(line,labels[0]+"."+labels[1]+".")&&
+    strings.Contains(line,"."+labels[2]) {
+    denied=true;break
+   }
+  }
+  if !denied{out=append(out,origin)}
+ }
  return out
 }
