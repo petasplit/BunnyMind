@@ -23,6 +23,7 @@ func init() {
 		listRolesTool{},
 		evidenceReviewTool{},
 		programIntakeTool{},
+		passiveCTTool{},
 		scopedReadTool{},
 		investigationBoardTool{},
 		inventoryGraphTool{},
