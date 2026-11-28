@@ -73,8 +73,8 @@ func Validate(p Plan,guard bunnyguard.Policy)error{
  getAllowed:=len(guard.AllowedMethods)==0
  for _,m:=range guard.AllowedMethods{if strings.EqualFold(m,"GET"){getAllowed=true}}
  if !getAllowed{return errors.New("GET not permitted by engagement")}
- if strings.HasPrefix(u.Path,"//")||strings.Contains(u.EscapedPath(),"%2e")||
-  strings.Contains(u.EscapedPath(),"%2f")||strings.Contains(u.EscapedPath(),"%5c"){
+ if strings.HasPrefix(u.Path,"//")||strings.Contains(strings.ToLower(u.EscapedPath()),"%2e")||
+  strings.Contains(strings.ToLower(u.EscapedPath()),"%2f")||strings.Contains(strings.ToLower(u.EscapedPath()),"%5c"){
   return errors.New("unsafe encoded crawl path")
  }
  return nil
@@ -96,8 +96,8 @@ func permittedLink(seed *url.URL,base *url.URL,raw string)(string,bool){
  if err!=nil||link==nil||link.User!=nil||link.Opaque!=""{return "",false}
  resolved:=base.ResolveReference(link)
  if !sameOrigin(seed,resolved)||harmfulPath(resolved.Path){return "",false}
- if strings.HasPrefix(resolved.Path,"//")||strings.Contains(resolved.EscapedPath(),"%2e")||
-  strings.Contains(resolved.EscapedPath(),"%2f")||strings.Contains(resolved.EscapedPath(),"%5c"){return "",false}
+ if strings.HasPrefix(resolved.Path,"//")||strings.Contains(strings.ToLower(resolved.EscapedPath()),"%2e")||
+  strings.Contains(strings.ToLower(resolved.EscapedPath()),"%2f")||strings.Contains(strings.ToLower(resolved.EscapedPath()),"%5c"){return "",false}
  ext:=strings.ToLower(path.Ext(resolved.Path))
  switch ext{
  case ".jpg",".jpeg",".png",".gif",".webp",".svg",".pdf",".zip",".exe",".woff",".woff2",".ttf",".mp4",".mp3",".ico":return "",false
@@ -200,7 +200,7 @@ func Run(ctx context.Context,p Plan,guard bunnyguard.Policy,evidenceRoot string)
   else{out.StopReason="frontier_exhausted"}
  }
  out.FinishedUTC=time.Now().UTC().Format(time.RFC3339Nano)
- folder:=filepath.Join(evidenceRoot,"crawl_"+sha([]byte(p.EngagementID+"|"+p.SeedURL))[:16])
+ folder:=filepath.Join(evidenceRoot,fmt.Sprintf("crawl_%s_%d",sha([]byte(p.EngagementID+"|"+p.SeedURL))[:16],time.Now().UnixNano()))
  if err:=writeSummary(folder,out);err!=nil{return out,fmt.Errorf("cannot write private crawl summary: %w",err)}
  return out,nil
 }
