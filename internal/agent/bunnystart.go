@@ -108,7 +108,7 @@ func authorizedAutoEngagement(message,manifestPath string)(autoEngagement,string
 func scopeDocumentationReply(req Request) string {
  if req.Quiet||req.Depth!=0||!securityAssessmentRequest(req){return ""}
  lower:=strings.ToLower(req.Message)
- if !strings.Contains(lower,"yeswehack.com/programs/"){return ""}
+ if !strings.Contains(lower,"yeswehack.com/programs/") && !(strings.Contains(lower,"yeswehack") && strings.Contains(lower,"bug bounty")){return ""}
  // A separate Target/Scope pair can already use the approved guard path.
  if brief,ok:=parseAutoEngagement(req.Message);ok&&brief.URL!=""{return ""}
  return "I can help with this authorized bug-bounty program. The YesWeHack link is the program description, not a confirmed in-scope testing endpoint. To start an actual assessment, configure BunnyGuard (ANTARES_BUNNY_GUARD_POLICY) with the program's allowed origins and methods, and provide an exact in-scope target URL in a Target: line plus a matching Scope: line. Once those match the approved manifest, BunnyMind can begin with a bounded scoped_read and preserve the evidence. No external scan has been started, and I will not mistake the YesWeHack platform itself for an authorized target."
