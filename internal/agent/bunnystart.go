@@ -170,23 +170,47 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
   if err!=nil{return next,count,err}
   history=next
   if ran{count++}
-  // Public certificate logs are metadata; they do not contact any target.
-  // Derive at most one registrable search root from a *verified* program
-  // scope row, not an arbitrary URL written by the model.
-  if raw!="" && strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))=="" {
+  // Continue with real tools, not a planning essay. Passive CT is safe
+  // without an active target manifest. With a reviewed BunnyGuard manifest,
+  // start the first finite, explicitly allowlisted web origin that the
+  // current program description and exclusions support.
+  if raw!="" {
    var snapshot bunnyprogram.Snapshot
-   if json.Unmarshal([]byte(raw),&snapshot)==nil{
-    roots:=bunnypassive.RootsForProgram(snapshot.ScopeEntries)
-    if len(roots)>0{
-     root:=roots[0]
-     for _,candidate:=range roots {
-      if candidate=="doctolib.fr"{root=candidate;break}
+   if json.Unmarshal([]byte(raw),&snapshot)==nil {
+    if policyPath:=strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy));policyPath!="" {
+     if g,err:=bunnyguard.New(policyPath);err==nil{
+      policy:=g.Manifest()
+      selected:=bunnyprogram.ApprovedIntersection(snapshot.ProposedExactWebOrigins,
+       policy.AllowedOrigins,snapshot.OutOfScope)
+      if len(selected)>0{
+       seed:=selected[0]
+       for _,candidate:=range selected{
+        if strings.Contains(candidate,"://www."){seed=candidate;break}
+       }
+       maximum:=policy.MaxNetworkCalls/2
+       if maximum>6{maximum=6}
+       if maximum>=1{
+        after,observed,_,e:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+         "scoped_crawl",map[string]any{"url":seed,"max_pages":maximum,"max_depth":1},history)
+        if e!=nil{return after,count,e}
+        history=after
+        if observed{count++}
+       }
+      }
      }
-     after,observed,_,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
-      "passive_subdomains",map[string]any{"domain":root},history)
-     if err!=nil{return after,count,err}
-     history=after
-     if observed{count++}
+    }else{
+     roots:=bunnypassive.RootsForProgram(snapshot.ScopeEntries)
+     if len(roots)>0{
+      root:=roots[0]
+      for _,candidate:=range roots{
+       if candidate=="doctolib.fr"{root=candidate;break}
+      }
+      after,observed,_,e:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+       "passive_subdomains",map[string]any{"domain":root},history)
+      if e!=nil{return after,count,e}
+      history=after
+      if observed{count++}
+     }
     }
    }
   }
