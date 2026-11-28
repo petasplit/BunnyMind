@@ -377,6 +377,22 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		return nil, err
 	}
 	sess := prep.sess
+	// A bug bounty policy URL alone is not a testing origin. Answer this
+	// specific configuration blocker deterministically; smaller local models
+	// sometimes respond with an unexplained refusal or print a pseudo tool
+	// call instead. No network operation is implied or performed here.
+	if reply := scopeDocumentationReply(req); reply != "" {
+		if err := emit(Event{Type: EventText, Delta: reply}); err != nil {
+			return nil, err
+		}
+		if !req.Quiet {
+			a.persistAssistant(ctx, sess.ID, prep.modelName, &llm.Response{Content: reply})
+		}
+		if err := a.finalizeTurn(ctx, req, sess, reply, nil, emit); err != nil {
+			return nil, err
+		}
+		return &Result{SessionID: sess.ID, Reply: reply, Turns: 0}, nil
+	}
 	client := prep.client
 	modelName := prep.modelName
 	providerName := prep.providerName
@@ -493,6 +509,19 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		}
 		if err != nil {
 			return nil, err
+		}
+		// Some local OpenAI-compatible models print a JSON tool call as
+		// assistant text instead of returning the native tool_calls field.
+		// Recover only exact read-only calls on the first model turn and
+		// never treat prose, shell code or arbitrary target requests as tools.
+		// A streamed pseudo-call is reset before the actual tool event.
+		if turn==1 && totalToolCalls==0 && (!securityAssessmentRequest(req) || readySecurityMission(req)) && recoverReadOnlyToolCall(resp, func(name string) bool {
+			_, ok := byName[name]
+			return ok
+		}) {
+			if !suppressToolNarration {
+				if err := emit(Event{Type: EventReset}); err != nil { return nil, err }
+			}
 		}
 		if suppressToolNarration {
 			if len(resp.ToolCalls) > 0 {

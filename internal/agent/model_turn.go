@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/enowdev/antares/internal/llm"
@@ -29,6 +30,44 @@ func validateToolCallArguments(resp *llm.Response) error {
 		}
 	}
 	return nil
+}
+
+// recoverReadOnlyToolCall recognizes a small local model's exact JSON
+// pseudo-tool-call output when a provider didn't encode a native tool_calls
+// object. Only preapproved read-only tools can be recovered, and their ordinary
+// tool implementations still enforce toolset, guard and network policy.
+// Arbitrary code/shell/authenticated requests are NEVER recovered this way.
+func recoverReadOnlyToolCall(resp *llm.Response, available func(string) bool) bool {
+ if resp==nil||len(resp.ToolCalls)>0{return false}
+ raw:=strings.TrimSpace(resp.Content)
+ if len(raw)<10||len(raw)>4096||!strings.HasPrefix(raw,"{"){return false}
+ var envelope struct {
+  Name string `json:"name"`
+  Arguments json.RawMessage `json:"arguments"`
+ }
+ dec:=json.NewDecoder(strings.NewReader(raw))
+ dec.DisallowUnknownFields()
+ if err:=dec.Decode(&envelope);err!=nil{return false}
+ var extra any
+ if err:=dec.Decode(&extra);err!=io.EOF{return false}
+ switch envelope.Name {
+ case "web_fetch","web_search","scoped_read","read_file","list_files","glob","grep":
+ default:return false
+ }
+ if !available(envelope.Name){return false}
+ // An object, not a JSON string, array or executable payload.
+ var args map[string]any
+ if err:=json.Unmarshal(envelope.Arguments,&args);err!=nil||args==nil{return false}
+ if envelope.Name=="scoped_read" {
+  if m,ok:=args["method"].(string);ok&&m!="GET"&&m!="HEAD"{return false}
+ }
+ resp.Content=""
+ resp.ToolCalls=[]llm.ToolCall{{
+  ID:newID("tool"),
+  Name:envelope.Name,
+  Arguments:string(envelope.Arguments),
+ }}
+ return true
 }
 
 // callModel runs one completion, streaming when enabled.
