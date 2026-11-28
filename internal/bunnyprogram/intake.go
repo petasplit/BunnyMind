@@ -27,6 +27,7 @@ type Snapshot struct {
  PageSHA256 string `json:"page_sha256"`
  PageBytes int `json:"page_bytes"`
  ScopeEntries []string `json:"scope_entries"`
+ ProposedExactWebOrigins []string `json:"proposed_exact_web_origins"`
  OutOfScope []string `json:"out_of_scope"`
  TestingPrecautions []string `json:"testing_precautions"`
  Notes []string `json:"notes"`
@@ -177,6 +178,7 @@ func Parse(programURL string,body []byte)(Snapshot,error){
    out.Notes=appendUnique(out.Notes,"Program mentions maximum 10 requests per second; use a gentler default.",5)
   }
  }
+ out.ProposedExactWebOrigins=ExactWebOrigins(out.ScopeEntries)
  if len(out.ScopeEntries)==0{
   out.Notes=appendUnique(out.Notes,"No machine-readable scope rows verified: review the program in a browser; no asset is approved automatically.",6)
  }
