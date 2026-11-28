@@ -134,11 +134,17 @@ func (s *Session) Start(ctx context.Context) error {
 			"--user-data-dir=" + dir,
 			"--no-first-run", "--no-default-browser-check",
 			"--disable-background-networking", "--disable-sync",
-			// Containers and root users cannot use the sandbox; without this
-			// Chrome exits immediately on many servers.
-			"--no-sandbox", "--disable-dev-shm-usage",
+			// Never disable the Chromium process sandbox for real scoped
+			// external websites. A sandboxless browser gives an untrusted
+			// page far more access to the host operating system.
+			"--disable-dev-shm-usage",
 			"--window-size=" + strconv.Itoa(s.opts.Width) + "," + strconv.Itoa(s.opts.Height),
 			"about:blank",
+		}
+		// Local root-owned Linux fixtures may need no-sandbox in a container.
+		// External authorized browser assessments must retain sandboxing.
+		if runtime.GOOS=="linux" && os.Geteuid()==0 && !scoped {
+			args=append(args,"--no-sandbox")
 		}
 		if scoped {
    args=append(args,
