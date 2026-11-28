@@ -179,6 +179,22 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured bounded Python evidence capture"}
   }
+ case "program_intake":
+  // Public policy retrieval is constrained to the YesWeHack program host.
+  // It consumes one audited network operation, but never grants access
+  // to any linked application or third-party endpoint.
+  network=true
+  var input struct{ URL string `json:"url"` }
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&input);err!=nil{d.Reason="invalid program URL arguments";break}
+  u,err:=url.Parse(input.URL)
+  if err!=nil||u==nil||u.Scheme!="https"||!strings.EqualFold(u.Host,"yeswehack.com")||
+   !strings.HasPrefix(u.Path,"/programs/")||u.RawQuery!=""||u.Fragment!=""{
+   d.Reason="public program intake only permits yeswehack.com program pages"
+  }else{
+   origin="https://yeswehack.com"
+   d=Decision{Allowed:true,Reason:"public program documentation fetch"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
