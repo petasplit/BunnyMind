@@ -28,6 +28,7 @@ type Snapshot struct {
  PageBytes int `json:"page_bytes"`
  ScopeEntries []string `json:"scope_entries"`
  ProposedExactWebOrigins []string `json:"proposed_exact_web_origins"`
+ ScopeProposalFile string `json:"scope_proposal_file,omitempty"`
  OutOfScope []string `json:"out_of_scope"`
  TestingPrecautions []string `json:"testing_precautions"`
  Notes []string `json:"notes"`
