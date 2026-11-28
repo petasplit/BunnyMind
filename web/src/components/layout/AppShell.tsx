@@ -383,6 +383,7 @@ export function AppShell() {
         <div ref={motionRoot} className="flex min-h-dvh bg-background">
           {/* Desktop sidebar */}
           <aside
+            data-testid="desktop-sidebar"
             className={cn(
               'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-sidebar lg:flex',
               railCollapsed ? 'w-16' : 'w-64',
