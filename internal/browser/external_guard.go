@@ -26,6 +26,7 @@ type externalGate struct{
  next time.Time
  calls atomic.Int64
  blocked atomic.Int64
+ readOnly atomic.Bool
 }
 func canonicalHTTPSOrigin(raw string)(string,error){
  u,err:=url.Parse(raw)
@@ -64,6 +65,7 @@ func (g *externalGate) allow(raw,method string)bool{
   u.Scheme!="https"||u.Hostname()==""||u.Fragment!=""||
   !g.allowed["https://"+strings.ToLower(u.Hostname())]||
   (u.Port()!=""&&u.Port()!="443"){return false}
+ if g.readOnly.Load() && method!="GET" && method!="HEAD" {return false}
  switch method{
  case "GET","HEAD","OPTIONS":
  case "POST":
@@ -93,6 +95,7 @@ func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
  g,err:=newExternalGate(s.opts.ExternalOrigins,s.opts.ExternalPostPaths,s.opts.ExternalMaxRequests,s.opts.ExternalMinIntervalMS)
  if err!=nil{return err}
  if _,err:=externalProxyAddress(s.opts.ExternalProxyURL);err!=nil{return err}
+ s.externalGate=g
  c.setOnEvent(func(method string,params json.RawMessage,sessionID string){
   switch method{
   case "Target.attachedToTarget":
@@ -150,5 +153,17 @@ func (s *Session) configureExternalGuard(ctx context.Context,c *conn)error{
   "autoAttach":true,"waitForDebuggerOnStart":true,"flatten":true,
   "filter":[]map[string]any{{"type":"page","exclude":false}},
  });err!=nil{return fmt.Errorf("cannot guard new browser tabs: %w",err)}
+ return nil
+}
+
+// LockExternalReadOnly makes an approved authenticated browser's subsequent
+// navigation incapable of sending POST/OPTIONS/mutating requests through the
+// CDP request-stage gate. The separately pinned proxy still enforces origins.
+// This transition is one-way for a browser session.
+func (s *Session) LockExternalReadOnly() error {
+ s.mu.Lock()
+ defer s.mu.Unlock()
+ if !s.started||s.externalGate==nil{return errors.New("external protected browser is not running")}
+ s.externalGate.readOnly.Store(true)
  return nil
 }

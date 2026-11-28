@@ -12,6 +12,7 @@ import (
 // events via DrainNetwork.
 type NetworkRequest struct {
 	RequestID string
+	ResourceType string // Document, XHR, Fetch, Script; never contains page contents
 	Method    string
 	URL       string
 	Headers   map[string]string
@@ -82,7 +83,7 @@ func (s *Session) DrainNetwork(ctx context.Context) []NetworkRequest {
 		}
 		// Skip prefetch, beacon, image-cache hits, and the like. Hackbrowser
 		// cares about the API surface, not favicon noise.
-		if ev.Type != "" && ev.Type != "XHR" && ev.Type != "Fetch" && ev.Type != "Document" {
+		if ev.Type != "" && ev.Type != "XHR" && ev.Type != "Fetch" && ev.Type != "Document" && ev.Type != "Script" {
 			continue
 		}
 		if _, exists := requests[ev.RequestID]; !exists {
@@ -90,6 +91,7 @@ func (s *Session) DrainNetwork(ctx context.Context) []NetworkRequest {
 			order = append(order, ev.RequestID)
 		}
 		r := requests[ev.RequestID]
+		r.ResourceType = ev.Type
 		r.Method = ev.Request.Method
 		r.URL = ev.Request.URL
 		r.Headers = ev.Request.Headers
@@ -112,7 +114,7 @@ func (s *Session) DrainNetwork(ctx context.Context) []NetworkRequest {
 		if json.Unmarshal(raw, &ev) != nil {
 			continue
 		}
-		if ev.Type != "" && ev.Type != "XHR" && ev.Type != "Fetch" && ev.Type != "Document" {
+		if ev.Type != "" && ev.Type != "XHR" && ev.Type != "Fetch" && ev.Type != "Document" && ev.Type != "Script" {
 			continue
 		}
 		req, ok := requests[ev.RequestID]
@@ -124,6 +126,7 @@ func (s *Session) DrainNetwork(ctx context.Context) []NetworkRequest {
 			requests[ev.RequestID] = req
 			order = append(order, ev.RequestID)
 		}
+		if req.ResourceType == "" {req.ResourceType = ev.Type}
 		req.Response = &NetworkResponse{
 			Status:   ev.Response.Status,
 			URL:      ev.Response.URL,

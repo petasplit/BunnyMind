@@ -110,6 +110,7 @@ func securityActionStatus(name string)string{
  case "auth_access_matrix":return "Comparing test-account access evidence"
  case "auth_browser_lab":return "Testing isolated browser sign-in"
  case "approved_browser_auth":return "Running approved external sign-in workflow"
+ case "approved_headless_crawl":return "Crawling authenticated pages and indexing JavaScript endpoints"
  case "finding_focus":return "Reviewing recorded finding evidence"
  case "engagement_profile":return "Prioritizing approved assessment targets"
  case "python_proof_run":return "Generating and validating Python HTTP evidence"

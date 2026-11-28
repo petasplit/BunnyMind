@@ -1379,6 +1379,7 @@ export default function ChatPage() {
                 setSidebarMobileOpen((v) => !v)
               }
             }}
+            data-testid="project-sidebar-toggle"
             title={t('project.sidebarShow')}
             aria-label={t('project.sidebarShow')}
           >
@@ -1400,6 +1401,7 @@ export default function ChatPage() {
         // scrolling during live, growing assistant responses.
         <div
           ref={bindScroller}
+          data-testid="chat-transcript"
           role="log"
           aria-label="Conversation transcript"
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
@@ -1432,7 +1434,7 @@ export default function ChatPage() {
           tool labels of varying length). Inside the list that turned every tick
           into a resize the scroller had to correct for, which is what made the
           viewport judder while pinned to the bottom. */}
-      <div className="bg-gradient-to-t from-background via-background to-transparent px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div data-testid="chat-composer" className="bg-gradient-to-t from-background via-background to-transparent px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-3xl">
           <div className="h-6 overflow-hidden pb-1" aria-live="polite">
             {streaming ? (
@@ -1475,7 +1477,7 @@ export default function ChatPage() {
                 className="m-fade absolute inset-0 bg-black/50"
                 onClick={() => setSidebarMobileOpen(false)}
               />
-              <div role="dialog" aria-modal="true" aria-label={t('project.sidebarShow')} className="m-slide absolute inset-y-0 right-0 w-[85%] max-w-sm overflow-hidden rounded-l-[var(--radius-xl)] bg-background">
+              <div role="dialog" aria-modal="true" aria-label={t('project.sidebarShow')} data-testid="project-sidebar-panel" className="m-slide absolute inset-y-0 right-0 w-[85%] max-w-sm overflow-hidden rounded-l-[var(--radius-xl)] bg-background">
                 <ProjectSidebar
                   projectDir={projectDir}
                   sessionId={sessionId}

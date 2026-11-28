@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,7 @@ type Session struct {
  parentSession string
  popupMax int
  virtualReady atomic.Bool
+ externalGate *externalGate
 
 }
 
@@ -133,11 +135,19 @@ func (s *Session) Start(ctx context.Context) error {
 			"--user-data-dir=" + dir,
 			"--no-first-run", "--no-default-browser-check",
 			"--disable-background-networking", "--disable-sync",
-			// Containers and root users cannot use the sandbox; without this
-			// Chrome exits immediately on many servers.
-			"--no-sandbox", "--disable-dev-shm-usage",
+			// Never disable the Chromium process sandbox for real scoped
+			// external websites. A sandboxless browser gives an untrusted
+			// page far more access to the host operating system.
+			"--disable-dev-shm-usage",
 			"--window-size=" + strconv.Itoa(s.opts.Width) + "," + strconv.Itoa(s.opts.Height),
 			"about:blank",
+		}
+		// Disposable Linux loopback fixtures run inside CI/container
+		// sandboxes that may deny Chrome's nested process sandbox even as
+		// an unprivileged user. Retain that exception *only* for numeric
+		// loopback fixtures, never for real scoped external browsing.
+		if runtime.GOOS=="linux" && s.opts.LoopbackOrigin!="" && !scoped {
+			args=append(args,"--no-sandbox")
 		}
 		if scoped {
    args=append(args,
@@ -334,6 +344,7 @@ func (s *Session) killLocked() {
  s.popupMu.Unlock()
  s.parentSession=""
  s.virtualReady.Store(false)
+ s.externalGate=nil
 	s.targetID = ""
 	if s.tempDir != "" {
 		_ = os.RemoveAll(s.tempDir)

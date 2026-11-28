@@ -161,6 +161,18 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured external browser workflow"}
   }
+ case "approved_headless_crawl":
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="headless crawl accepts no model-written targets or login steps"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_BROWSER_SCOPE"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_LOGIN_PLAN"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_CRAWL_CONFIG"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_PROOF_OUTPUT"))==""{
+   d.Reason="operator-owned approved headless browser configuration not provisioned"
+  }else{
+   d=Decision{Allowed:true,Reason:"operator-configured bounded authenticated browser crawl"}
+  }
  case "python_adaptive_proof_run":
   network=true
   if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{

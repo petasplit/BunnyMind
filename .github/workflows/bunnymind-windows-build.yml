@@ -50,7 +50,9 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-adaptive-proof-windows-x64.exe ./cmd/bunny-adaptive-proof
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-program-intake-windows-x64.exe ./cmd/bunny-program-intake
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-scoped-crawl-windows-x64.exe ./cmd/bunny-scoped-crawl
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-headless-crawl-windows-x64.exe ./cmd/bunny-headless-crawl
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-approved-auth-windows-x64.exe ./cmd/bunny-approved-auth
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe BunnyMind-headless-crawl-windows-x64.exe BunnyMind-approved-auth-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -64,6 +66,8 @@ jobs:
             dist/BunnyMind-adaptive-proof-windows-x64.exe
             dist/BunnyMind-program-intake-windows-x64.exe
             dist/BunnyMind-scoped-crawl-windows-x64.exe
+            dist/BunnyMind-headless-crawl-windows-x64.exe
+            dist/BunnyMind-approved-auth-windows-x64.exe
             dist/SHA256SUMS.txt
             dist/CHAT_CHUNKS.txt
           retention-days: 7
@@ -317,3 +321,57 @@ jobs:
             }
             Write-Host "PASS: native Windows synthetic signup, email OTP, session isolation $mode"
           }
+
+  windows-browser-ui-e2e:
+    needs: windows-x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: BunnyMind-windows-x64-ci
+          path: dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated Playwright test client
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.56.0
+      - name: Browser regression for real embedded ChatPage and desktop/mobile drawers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe=Join-Path $PWD 'dist/BunnyMind-windows-x64.exe'
+          $env:ANTARES_HOME=Join-Path $env:RUNNER_TEMP 'bunnymind-ui-e2e-home'
+          $env:ANTARES_HOST='127.0.0.1'
+          $env:ANTARES_PORT='18787'
+          $env:ANTARES_DISABLE_MODELS_FETCH='1'
+          $out=Join-Path $env:RUNNER_TEMP 'bunnymind-ui-server.out'
+          $err=Join-Path $env:RUNNER_TEMP 'bunnymind-ui-server.err'
+          $server=Start-Process -FilePath $exe -ArgumentList '--foreground' -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          try {
+            $healthy=$false
+            for($i=0;$i -lt 70;$i++){
+              if($server.HasExited){ throw 'BunnyMind exited before browser UI test' }
+              try{
+                $response=Invoke-RestMethod 'http://127.0.0.1:18787/api/health' -TimeoutSec 2
+                if($response.ok -eq $true){$healthy=$true;break}
+              }catch{}
+              Start-Sleep -Milliseconds 500
+            }
+            if(-not $healthy){throw 'BunnyMind did not become healthy for browser test'}
+            python tests/e2e/chat_sidebar_playwright.py --base http://127.0.0.1:18787 --artifacts dist/ui-regression
+            if($LASTEXITCODE -ne 0){throw 'Browser UI regression failed'}
+          } finally {
+            if(-not $server.HasExited){Stop-Process -Id $server.Id -Force}
+            Get-Content $err -ErrorAction SilentlyContinue | Select-Object -Last 20
+          }
+      - name: Upload browser E2E result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BunnyMind-chat-sidebar-ui-e2e
+          path: dist/ui-regression/
+          retention-days: 14
+          if-no-files-found: warn
