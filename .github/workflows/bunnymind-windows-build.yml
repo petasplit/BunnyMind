@@ -70,6 +70,51 @@ jobs:
         with:
           name: BunnyMind-windows-x64-ci
           path: dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run native Windows adaptive Python evidence, keyring and seal integration smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = (Get-Command python).Source
+          $guard = Join-Path $PWD 'tests/fixtures/guard-loopback.json'
+          $spec = Join-Path $PWD 'tests/fixtures/adaptive-loopback.json'
+          $serverSource = Join-Path $PWD 'tests/fixtures/bunnymind_local_fixture.py'
+          $proofExe = Join-Path $PWD 'dist/BunnyMind-python-proof-windows-x64.exe'
+          $adaptiveExe = Join-Path $PWD 'dist/BunnyMind-adaptive-proof-windows-x64.exe'
+          $vault = Join-Path $env:RUNNER_TEMP 'bunnymind-python-vault'
+          $srv = Start-Process -FilePath $python -ArgumentList @('-u', $serverSource, '--port', '18786') -PassThru
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 40; $i++) {
+              if ($srv.HasExited) { throw 'Local Python fixture stopped before verification' }
+              try {
+                $health = Invoke-WebRequest -Uri 'http://127.0.0.1:18786/health' -UseBasicParsing -TimeoutSec 2
+                if ($health.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $ready) { throw 'Local fixture did not become healthy' }
+            & $proofExe --init-key
+            if ($LASTEXITCODE -ne 0) { throw 'Evidence encryption key enrollment failed on Windows' }
+            $raw = & $adaptiveExe --guard $guard --spec $spec --out $vault --python $python
+            if ($LASTEXITCODE -ne 0) { throw 'Native Windows adaptive proof runner failed' }
+            $campaign = ($raw -join "`n") | ConvertFrom-Json
+            if ($campaign.outcome -ne 'replicated_observation_unverified' -or
+                $campaign.requests_used -ne 12 -or $campaign.runs.Count -ne 3) {
+              throw 'Adaptive proof fixture did not repeat the expected controlled response with negative controls'
+            }
+            foreach ($run in $campaign.runs) {
+              $round = Join-Path (Join-Path $vault 'bunnymindlocal01') $run.run_id
+              foreach ($name in @('scenario.py', 'plan.json', 'validation.json', 'transcript.enc', 'seal.json')) {
+                if (-not (Test-Path (Join-Path $round $name))) { throw "Missing sealed proof artifact: $($run.run_id)/$name" }
+              }
+            }
+            Write-Host 'PASS: Windows keyring, Python 3, adaptive HTTP controls, generated scripts, encrypted evidence and audit seals'
+          } finally {
+            if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
+          }
       - name: Launch actual BunnyMind Windows server and verify embedded dashboard
         shell: pwsh
         run: |
