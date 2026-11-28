@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "file": "ast_sample.js",
+  "sources": [
+    "src/app.ts"
+  ],
+  "names": [],
+  "mappings": "AAAA;AAAA",
+  "sourcesContent": [
+    "// test fixture source - not included in output"
+  ]
+}
