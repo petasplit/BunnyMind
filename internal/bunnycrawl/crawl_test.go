@@ -22,6 +22,7 @@ func localPolicy(serverURL string)bunnyguard.Policy {
  }
 }
 func TestCrawlOnlySameOriginSafeReadLinks(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  var hitExternal,hitLogout int
  srv:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
   if r.URL.Path=="/logout"{hitLogout++}

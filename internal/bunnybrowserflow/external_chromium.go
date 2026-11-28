@@ -8,6 +8,7 @@ import (
  "github.com/enowdev/antares/internal/browser"
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyquota"
 )
 
 // ApprovedChromiumFactory is constructed by trusted command/controller code,
@@ -45,6 +46,17 @@ func (f ApprovedChromiumFactory) New(ctx context.Context,actor,origin string)(Br
 func RunConfiguredApproved(ctx context.Context,scope ApprovedScope,plan Plan,
  provider Secrets,operator Handoff,manifest bunnyguard.Policy,headless bool)(Result,error){
  if _,err:=ValidateApprovedScope(scope,manifest);err!=nil{return Result{},err}
+ // The shared cross-process budget is reserved before any browser egress.
+ // Count all configured actors; the original per-browser CDP gate enforces
+ // the per-identity maximum regardless of actual request count.
+ actors:=map[string]bool{}
+ for _,step:=range plan.Steps{actors[step.Actor]=true}
+ if err:=actorBudget(plan,scope,manifest);err!=nil{return Result{},err}
+ release,err:=bunnyquota.ExecutionLeaseShared(ctx,manifest.EngagementID)
+ if err!=nil{return Result{},err}
+ defer release()
+ if _,err:=bunnyquota.ReserveShared(ctx,manifest.EngagementID,
+  scope.MaxBrowserRequests*len(actors),manifest.MaxNetworkCalls);err!=nil{return Result{},err}
  proxy,err:=bunnyegress.New(bunnyegress.Config{
   Origins:scope.AllowedOrigins,MaxTunnels:scope.MaxTunnels,
  })

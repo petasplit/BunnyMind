@@ -43,6 +43,7 @@ func controlled(t *testing.T)(Spec,bunnyguard.Policy,func()){
  return s,policy,server.Close
 }
 func TestAdaptiveProofEscalatesOnlyToRepeatedObservation(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  python,err:=exec.LookPath("python3")
  if err!=nil{python,err=exec.LookPath("python")}
  if err!=nil{t.Skip("Python not installed")}
@@ -131,6 +132,7 @@ func (fakeCookies) Resolve(_ context.Context,actor,key string)(string,error){
  return "",errors.New("unknown test account")
 }
 func TestAdaptiveOwnerPeerSameResourceWithSeparateCredentials(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  python,err:=exec.LookPath("python3")
  if err!=nil{python,err=exec.LookPath("python")}
  if err!=nil{t.Skip("Python 3 required")}

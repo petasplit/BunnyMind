@@ -52,7 +52,11 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-scoped-crawl-windows-x64.exe ./cmd/bunny-scoped-crawl
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-headless-crawl-windows-x64.exe ./cmd/bunny-headless-crawl
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-approved-auth-windows-x64.exe ./cmd/bunny-approved-auth
-          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe BunnyMind-headless-crawl-windows-x64.exe BunnyMind-approved-auth-windows-x64.exe > SHA256SUMS.txt)
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-evidence-judge-windows-x64.exe ./cmd/bunny-evidence-judge
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-browser-replay-windows-x64.exe ./cmd/bunny-browser-replay
+          go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-specialist-sandbox-windows-x64.exe ./cmd/bunny-specialist-sandbox
+          bun build --compile --target=bun-windows-x64 ./web/scripts/bunnymind_ast.mjs --outfile dist/BunnyMind-js-ast-windows-x64.exe
+          (cd dist && sha256sum BunnyMind-windows-x64.exe BunnyMind-authz-demo-windows-x64.exe BunnyMind-fix-demo-windows-x64.exe BunnyMind-authflow-demo-windows-x64.exe BunnyMind-python-proof-windows-x64.exe BunnyMind-adaptive-proof-windows-x64.exe BunnyMind-program-intake-windows-x64.exe BunnyMind-scoped-crawl-windows-x64.exe BunnyMind-headless-crawl-windows-x64.exe BunnyMind-approved-auth-windows-x64.exe BunnyMind-evidence-judge-windows-x64.exe BunnyMind-browser-replay-windows-x64.exe BunnyMind-specialist-sandbox-windows-x64.exe BunnyMind-js-ast-windows-x64.exe > SHA256SUMS.txt)
       - name: Upload test build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -68,6 +72,10 @@ jobs:
             dist/BunnyMind-scoped-crawl-windows-x64.exe
             dist/BunnyMind-headless-crawl-windows-x64.exe
             dist/BunnyMind-approved-auth-windows-x64.exe
+            dist/BunnyMind-evidence-judge-windows-x64.exe
+            dist/BunnyMind-browser-replay-windows-x64.exe
+            dist/BunnyMind-specialist-sandbox-windows-x64.exe
+            dist/BunnyMind-js-ast-windows-x64.exe
             dist/SHA256SUMS.txt
             dist/CHAT_CHUNKS.txt
           retention-days: 7
@@ -161,6 +169,26 @@ jobs:
           } finally {
             if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
           }
+      - name: Check bundled JavaScript AST and source-map analyzer on Windows x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'dist/BunnyMind-js-ast-windows-x64.exe'
+          if (-not (Test-Path $exe)) { throw 'Standalone AST parser missing' }
+          $source = Join-Path $PWD 'tests/fixtures/ast_sample.js'
+          $map = Join-Path $PWD 'tests/fixtures/ast_sample.js.map'
+          $raw = & $exe --file $source --origin https://approved.example --map $map
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone AST parser failed on Windows' }
+          $parsed = ($raw -join "`n") | ConvertFrom-Json
+          if ($parsed.source_map.status -ne 'verified_map_metadata' -or $parsed.source_map.attributed -lt 1) {
+            throw 'AST parser did not verify source-map provenance'
+          }
+          if (($parsed.endpoints | Where-Object { $_.path -eq '/api/profile' }).Count -lt 1 -or
+              ($parsed.endpoints | Where-Object { $_.path -eq '/api/update' }).Count -lt 1) {
+            throw 'AST parser failed to discover synthetic fetch/axios endpoints'
+          }
+          if (($raw -join "") -match 'SECRET_LOCAL_VALUE') { throw 'AST parser leaked a query secret' }
+          Write-Host 'PASS: compiled Windows AST endpoint inventory and verified source-map provenance'
       - name: Launch actual BunnyMind Windows server and verify embedded dashboard
         shell: pwsh
         run: |
