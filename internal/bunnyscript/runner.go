@@ -141,12 +141,12 @@ func (runner Runner) Run(ctx context.Context,p Plan,policy bunnyguard.Policy)(Ev
  if root==""{return EvidenceSummary{},errors.New("explicit evidence destination required")}
  if len(root)>2048{return EvidenceSummary{},errors.New("evidence path too long")}
  if !runner.ExecutionLeaseHeld{
-  release,err:=bunnyquota.ExecutionLease(ctx,root,p.EngagementID)
+  release,err:=bunnyquota.ExecutionLeaseShared(ctx,p.EngagementID)
   if err!=nil{return EvidenceSummary{},fmt.Errorf("shared Python execution lease denied: %w",err)}
   defer release()
  }
  if !runner.BudgetReserved{
-  if _,err:=bunnyquota.Reserve(ctx,root,p.EngagementID,len(p.Cases),policy.MaxNetworkCalls);err!=nil{
+  if _,err:=bunnyquota.ReserveShared(ctx,p.EngagementID,len(p.Cases),policy.MaxNetworkCalls);err!=nil{
    return EvidenceSummary{},fmt.Errorf("shared engagement request budget denied: %w",err)
   }
  }
