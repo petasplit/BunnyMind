@@ -10,6 +10,7 @@ import (
 
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnyprogram"
+ "github.com/enowdev/antares/internal/bunnypassive"
  "github.com/enowdev/antares/internal/llm"
  "github.com/enowdev/antares/internal/store"
  "github.com/enowdev/antares/internal/tools"
@@ -128,12 +129,12 @@ func publicProgramURL(message string) string {
 // The result goes into persisted history and the same UI tool timeline.
 func (a *Agent) executeKickoff(ctx context.Context,req Request,sess *store.Session,
  byName map[string]tools.Tool,modelName string,emit Emit,name string,args map[string]any,
- history []llm.Message)([]llm.Message,bool,error) {
- if _,ok:=byName[name];!ok{return history,false,nil}
+ history []llm.Message)([]llm.Message,bool,string,error) {
+ if _,ok:=byName[name];!ok{return history,false,"",nil}
  serialized,err:=json.Marshal(args)
- if err!=nil{return history,false,err}
+ if err!=nil{return history,false,"",err}
  call:=llm.ToolCall{ID:newID("tool"),Name:name,Arguments:string(serialized)}
- if err:=emit(Event{Type:EventNotice,Message:securityActionStatus(name)});err!=nil{return history,false,err}
+ if err:=emit(Event{Type:EventNotice,Message:securityActionStatus(name)});err!=nil{return history,false,"",err}
  history=append(history,llm.Message{Role:llm.RoleAssistant,ToolCalls:[]llm.ToolCall{call}})
  if !req.Quiet{a.persistAssistant(ctx,sess.ID,modelName,&llm.Response{ToolCalls:[]llm.ToolCall{call}})}
  results:=a.executeTools(ctx,[]llm.ToolCall{call},byName,req,sess,emit)
@@ -143,11 +144,13 @@ func (a *Agent) executeKickoff(ctx context.Context,req Request,sess *store.Sessi
     ID:newID("msg"),SessionID:sess.ID,Role:store.RoleTool,
     Content:out.message.Content,ToolCallID:out.message.ToolCallID,ToolName:out.message.Name,
     Meta:store.Meta{"is_error":out.isError},
-   });err!=nil{return history,true,err}
+   });err!=nil{return history,true,"",err}
   }
  }
  history=appendTurnMessages(history,results,"",nil)
- return history,true,nil
+ raw:=""
+ if len(results)>0&&!results[0].isError{raw=results[0].message.Content}
+ return history,true,raw,nil
 }
 
 // autoKickoff selects the restricted read tool deterministically: the
@@ -159,11 +162,31 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
  history:=[]llm.Message{}
  count:=0
  if program:=publicProgramURL(req.Message);program!="" {
-  next,ran,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+  next,ran,raw,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
    "program_intake",map[string]any{"url":program},history)
   if err!=nil{return next,count,err}
   history=next
   if ran{count++}
+  // Public certificate logs are metadata; they do not contact any target.
+  // Derive at most one registrable search root from a *verified* program
+  // scope row, not an arbitrary URL written by the model.
+  if raw!="" && strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))=="" {
+   var snapshot bunnyprogram.Snapshot
+   if json.Unmarshal([]byte(raw),&snapshot)==nil{
+    roots:=bunnypassive.RootsForProgram(snapshot.ScopeEntries)
+    if len(roots)>0{
+     root:=roots[0]
+     for _,candidate:=range roots {
+      if candidate=="doctolib.fr"{root=candidate;break}
+     }
+     after,observed,_,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+      "passive_subdomains",map[string]any{"domain":root},history)
+     if err!=nil{return after,count,err}
+     history=after
+     if observed{count++}
+    }
+   }
+  }
  }
  brief,notice:=authorizedAutoEngagement(req.Message,strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy)))
  if notice!=""{
@@ -175,7 +198,7 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
   if err:=emit(Event{Type:EventNotice,Message:"Engagement paused: scoped_read is unavailable"});err!=nil{return history,count,err}
   return history,count,nil
  }
- next,ran,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+ next,ran,_,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
   "scoped_read",map[string]any{"url":brief.URL,"method":"GET","preview_bytes":2048},history)
  if err!=nil{return next,count,err}
  if ran{count++}
