@@ -95,6 +95,8 @@ func firstSecurityToolChoice(enabled bool)string{
 func securityActionStatus(name string)string{
  switch name{
  case "program_intake":return "Retrieving public program rules and exclusions"
+ case "passive_subdomains":return "Enumerating public certificate-transparency subdomains"
+ case "scoped_crawl":return "Crawling preapproved origin within bounded request budget"
  case "scoped_read":return "Inspecting in-scope URL"
  case "inventory_graph":return "Mapping observed assets"
  case "investigation_board":return "Updating investigation tasks"
