@@ -51,7 +51,7 @@ func readySecurityMission(req Request)bool{
 }
 func autoSelectSecurityRole(req *Request){
  if req==nil||req.Role!=""||req.Toolset!=""{return}
- if readySecurityMission(*req){req.Role="security"}
+ if readySecurityMission(*req)||(!req.Quiet&&req.Depth==0&&publicProgramURL(req.Message)!=""){req.Role="security"}
 }
 func toolAvailable(specs []llm.Tool,name string)bool{
  for _,tool:=range specs{if tool.Name==name{return true}}
@@ -94,6 +94,7 @@ func firstSecurityToolChoice(enabled bool)string{
 }
 func securityActionStatus(name string)string{
  switch name{
+ case "program_intake":return "Retrieving public program rules and exclusions"
  case "scoped_read":return "Inspecting in-scope URL"
  case "inventory_graph":return "Mapping observed assets"
  case "investigation_board":return "Updating investigation tasks"
