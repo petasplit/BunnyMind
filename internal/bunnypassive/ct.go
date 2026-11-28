@@ -47,7 +47,9 @@ func RootsForProgram(entries []string)[]string {
  roots:=[]string{}
  seen:=map[string]bool{}
  for _,entry:=range entries{
-  first:=strings.TrimSpace(strings.Fields(entry)[0])
+  fields:=strings.Fields(entry)
+  if len(fields)==0{continue}
+  first:=strings.TrimSpace(fields[0])
   if u,err:=url.Parse(first);err==nil&&u.Scheme!="" {first=u.Hostname()}
   first=strings.TrimPrefix(first,"*.")
   variants:=[]string{first}
