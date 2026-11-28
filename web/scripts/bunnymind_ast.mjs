@@ -212,6 +212,7 @@ async function main(){
  const report=inspect(source,origin,map);
  process.stdout.write(JSON.stringify(report)+"\n");
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if((typeof Bun!=="undefined"&&import.meta.main)||
+   (process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))){
  main().catch(e=>{process.stderr.write(String(e.message).slice(0,180)+"\n");process.exit(1);});
 }
