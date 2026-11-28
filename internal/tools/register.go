@@ -25,6 +25,7 @@ func init() {
 		programIntakeTool{},
 		passiveCTTool{},
 		scopedReadTool{},
+		scopedCrawlTool{},
 		investigationBoardTool{},
 		inventoryGraphTool{},
 		engagementBlackboardTool{},
