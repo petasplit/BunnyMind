@@ -196,8 +196,7 @@ func Run(ctx context.Context,p Plan,guard bunnyguard.Policy,evidenceRoot string)
  sort.Strings(out.DiscoveredPaths)
  if len(out.DiscoveredPaths)>100{out.DiscoveredPaths=out.DiscoveredPaths[:100]}
  if out.StopReason==""{
-  if len(out.Pages)==p.MaxPages{out.StopReason="max_pages"}
-  else{out.StopReason="frontier_exhausted"}
+  if len(out.Pages)==p.MaxPages { out.StopReason="max_pages" } else { out.StopReason="frontier_exhausted" }
  }
  out.FinishedUTC=time.Now().UTC().Format(time.RFC3339Nano)
  folder:=filepath.Join(evidenceRoot,fmt.Sprintf("crawl_%s_%d",sha([]byte(p.EngagementID+"|"+p.SeedURL))[:16],time.Now().UnixNano()))
