@@ -27,6 +27,7 @@ type Policy struct {
  AllowedMethods []string `json:"allowed_methods,omitempty"`
  MaxNetworkCalls int `json:"max_network_calls"`
  MinIntervalMS int `json:"min_interval_ms,omitempty"`
+ UserAgent string `json:"user_agent,omitempty"`
  AuditPath string `json:"audit_path,omitempty"`
 }
 type Decision struct { Allowed bool; Reason string }
@@ -77,6 +78,7 @@ func New(path string) (*Guard,error) {
  if strings.TrimSpace(p.EngagementID)=="" || len(p.AllowedOrigins)==0{return nil,errors.New("engagement_id and allowed_origins required")}
  if p.MaxNetworkCalls<1 || p.MaxNetworkCalls>100000 {return nil,errors.New("invalid request budget")}
  if p.MinIntervalMS<0 || p.MinIntervalMS>3600000 {return nil,errors.New("invalid minimum interval")}
+ if len(p.UserAgent)>160||strings.ContainsAny(p.UserAgent,"\r\n"){return nil,errors.New("invalid assessment User-Agent")}
  if len(p.AllowedCIDRs)>16{return nil,errors.New("too many CIDR exceptions")}
  for _,cidr:=range p.AllowedCIDRs{
   _,block,err:=net.ParseCIDR(cidr)
