@@ -49,6 +49,8 @@ type HeadlessReport struct {
  StartedUTC string `json:"started_utc"`
  CompletedUTC string `json:"completed_utc"`
  AuthStepsCompleted int `json:"auth_steps_completed"`
+ AuthEvidence []TrafficReceipt `json:"auth_evidence,omitempty"`
+ AuthScreenshots []bunnyartifact.Receipt `json:"auth_screenshots,omitempty"`
  Pages []HeadlessPage `json:"pages"`
  Endpoints []HeadlessEndpoint `json:"endpoints"`
  EncryptedCaptures []bunnyartifact.Receipt `json:"encrypted_captures,omitempty"`
@@ -203,8 +205,19 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
  return report,nil
 }
 
-type retainedBrowser struct{ Browser }
+type retainedBrowser struct{
+ Browser
+ driver *chromeDriver
+}
 func (retainedBrowser) Close(){}
+// Preserve existing authentication proof functionality while keeping this
+// one test-account Chromium alive for the strictly read-only crawl phase.
+func (r retainedBrowser) CaptureTraffic(ctx context.Context,actor string,step int,allowed map[string]bool)([]TrafficReceipt,error){
+ return r.driver.CaptureTraffic(ctx,actor,step,allowed)
+}
+func (r retainedBrowser) RecordScreenshot(ctx context.Context,actor,stage string)(bunnyartifact.Receipt,error){
+ return r.driver.RecordScreenshot(ctx,actor,stage)
+}
 type retainedFactory struct{
  inner ApprovedChromiumFactory
  mu sync.Mutex
@@ -220,7 +233,7 @@ func (r *retainedFactory) New(ctx context.Context,actor,origin string)(Browser,e
  r.mu.Lock()
  r.drivers[actor]=d
  r.mu.Unlock()
- return retainedBrowser{Browser:b},nil
+ return retainedBrowser{Browser:b,driver:d},nil
 }
 func (r *retainedFactory) Close(){
  r.mu.Lock();defer r.mu.Unlock()
@@ -268,6 +281,8 @@ func RunConfiguredHeadlessCrawl(ctx context.Context,scope ApprovedScope,login Pl
  if err!=nil{return report,err}
  report.EngagementID=manifest.EngagementID
  report.AuthStepsCompleted=auth.StepsCompleted
+ report.AuthEvidence=auth.Traffic
+ report.AuthScreenshots=auth.Screenshots
  root:=filepath.Join(evidenceRoot,manifest.EngagementID)
  if err:=os.MkdirAll(root,0700);err!=nil{return report,err}
  file:=filepath.Join(root,fmt.Sprintf("headless-crawl-%d.json",time.Now().UnixNano()))
