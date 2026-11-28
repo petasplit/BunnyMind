@@ -204,6 +204,15 @@ export default function ChatPage() {
   // by sidebarMobileOpen (starts closed so the chat has the full width).
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+  useEffect(() => {
+    if (!sidebarMobileOpen) return
+    const onEscape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();setSidebarMobileOpen(false)}
+    }
+    window.addEventListener('keydown',onEscape)
+    return () => window.removeEventListener('keydown',onEscape)
+  }, [sidebarMobileOpen])
+  useEffect(() => { setSidebarMobileOpen(false) }, [sessionId])
   // Bumped when a turn finishes, so the sidebar re-reads project_info the agent
   // may have just written.
   const [sidebarRefresh, setSidebarRefresh] = useState(0)
@@ -1178,6 +1187,7 @@ export default function ChatPage() {
     projectDirRef.current = ''
     setPendingProject('')
     setSidebarOpen(true)
+    setSidebarMobileOpen(false)
     setCtxUsed(0)
     navigate('/', { state: { fresh: true } })
   }
@@ -1465,7 +1475,7 @@ export default function ChatPage() {
                 className="m-fade absolute inset-0 bg-black/50"
                 onClick={() => setSidebarMobileOpen(false)}
               />
-              <div className="m-slide absolute inset-y-0 right-0 w-[85%] max-w-sm overflow-hidden rounded-l-[var(--radius-xl)] bg-background">
+              <div role="dialog" aria-modal="true" aria-label={t('project.sidebarShow')} className="m-slide absolute inset-y-0 right-0 w-[85%] max-w-sm overflow-hidden rounded-l-[var(--radius-xl)] bg-background">
                 <ProjectSidebar
                   projectDir={projectDir}
                   sessionId={sessionId}
