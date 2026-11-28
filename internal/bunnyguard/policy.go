@@ -146,7 +146,7 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
  switch tool{
  case "read_file","read_document","list_files","glob","grep","todo","skill",
  "session_search","rag_search","review_evidence","investigation_board","inventory_graph","engagement_blackboard","verify_lab_receipts","assess_authz_receipts","compare_authz_fix_receipts","compare_build_bound_fix","auth_workflow_lab","auth_browser_lab","research_next_step","finding_focus","engagement_profile","python_hypothesis_draft","report_finding","triage_finding","add_intel",
- "methodology_status","list_roles","view_image":
+ "methodology_status","list_roles","view_image","independent_evidence_judge","sandbox_specialist":
   d=Decision{Allowed:true,Reason:"offline tool"}
  case "http_request","web_fetch":
   d=Decision{Reason:"legacy HTTP tool unavailable in guarded mode; use scoped_read"}
@@ -175,6 +175,18 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
    d.Reason="operator-owned approved headless browser configuration not provisioned"
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured bounded authenticated browser crawl"}
+  }
+ case "approved_browser_replay":
+  network=true
+  if strings.TrimSpace(args)!=""&&strings.TrimSpace(args)!="{}"{
+   d.Reason="authenticated replay accepts no model-written target or secrets"
+  }else if strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_BROWSER_SCOPE"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_LOGIN_PLAN"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_CRAWL_CONFIG"))==""||
+   strings.TrimSpace(os.Getenv("BUNNY_PROOF_OUTPUT"))==""{
+   d.Reason="operator-owned browser replay configuration not provisioned"
+  }else{
+   d=Decision{Allowed:true,Reason:"operator-configured fresh-profile authenticated replay"}
   }
  case "python_adaptive_proof_run":
   network=true
