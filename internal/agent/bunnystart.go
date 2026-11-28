@@ -10,6 +10,7 @@ import (
 
  "github.com/enowdev/antares/internal/bunnyguard"
  "github.com/enowdev/antares/internal/bunnyprogram"
+ "github.com/enowdev/antares/internal/bunnybrowserflow"
  "github.com/enowdev/antares/internal/bunnypassive"
  "github.com/enowdev/antares/internal/llm"
  "github.com/enowdev/antares/internal/store"
@@ -189,7 +190,29 @@ func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
        }
        maximum:=policy.MaxNetworkCalls/2
        if maximum>6{maximum=6}
-       if maximum>=1{
+       headlessConfigured:=strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_BROWSER_SCOPE"))!=""&&
+        strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_LOGIN_PLAN"))!=""&&
+        strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_CRAWL_CONFIG"))!=""&&
+        strings.TrimSpace(os.Getenv("BUNNY_PROOF_OUTPUT"))!=""
+       headlessReady:=false
+       if headlessConfigured{
+        _,_,crawlPlan,_,e:=bunnybrowserflow.LoadHeadlessConfiguration(
+         policyPath,strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_BROWSER_SCOPE")),
+         strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_LOGIN_PLAN")),
+         strings.TrimSpace(os.Getenv("BUNNY_HEADLESS_CRAWL_CONFIG")))
+        if e==nil{
+         for _,approved:=range selected {
+          if strings.EqualFold(approved,crawlPlan.Origin){headlessReady=true;break}
+         }
+        }
+       }
+       if headlessReady {
+        after,observed,_,e:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+         "approved_headless_crawl",map[string]any{},history)
+        if e!=nil{return after,count,e}
+        history=after
+        if observed{count++}
+       }else if maximum>=1{
         after,observed,_,e:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
          "scoped_crawl",map[string]any{"url":seed,"max_pages":maximum,"max_depth":1},history)
         if e!=nil{return after,count,e}
