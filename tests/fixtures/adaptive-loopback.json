@@ -1,0 +1,16 @@
+{
+  "engagement_id": "bunny-local-fixture",
+  "campaign_id": "bunnymindlocal01",
+  "origin": "http://127.0.0.1:18786",
+  "marker": "BUNNY-OWNED-SUCCESS",
+  "candidate_paths": [
+    "/candidate-bad",
+    "/candidate-good"
+  ],
+  "negative_control_paths": [
+    "/control"
+  ],
+  "max_rounds": 4,
+  "max_requests": 16,
+  "min_interval_ms": 100
+}
