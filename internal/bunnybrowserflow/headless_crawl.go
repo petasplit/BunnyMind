@@ -248,11 +248,10 @@ func RunConfiguredHeadlessCrawl(ctx context.Context,scope ApprovedScope,login Pl
  if strings.TrimSpace(evidenceRoot)==""||len(evidenceRoot)>2048{return HeadlessReport{},errors.New("private evidence output directory required")}
  // Worst-case reserve all browser requests before any browser activity; a
  // concurrent Python/crawler runner using this root cannot reuse the budget.
- lease,err:=bunnyquota.ExecutionLease(ctx,evidenceRoot,manifest.EngagementID)
+ lease,err:=bunnyquota.ExecutionLeaseShared(ctx,manifest.EngagementID)
  if err!=nil{return HeadlessReport{},err}
  defer lease()
- if _,err:=bunnyquota.Reserve(ctx,evidenceRoot,manifest.EngagementID,
-  scope.MaxBrowserRequests,manifest.MaxNetworkCalls);err!=nil{return HeadlessReport{},err}
+ if _,err:=bunnyquota.ReserveShared(ctx,manifest.EngagementID,scope.MaxBrowserRequests,manifest.MaxNetworkCalls);err!=nil{return HeadlessReport{},err}
  vault,err:=newCaptureVault(evidenceRoot,manifest.EngagementID)
  if err!=nil{return HeadlessReport{},errors.New("private encrypted browser vault or local key unavailable")}
  proxy,err:=bunnyegress.New(bunnyegress.Config{Origins:scope.AllowedOrigins,MaxTunnels:scope.MaxTunnels})
