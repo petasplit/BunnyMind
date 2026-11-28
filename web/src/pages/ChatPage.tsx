@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Virtuoso, type IndexLocationWithAlign, type VirtuosoHandle } from 'react-virtuoso'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowRight,
@@ -30,7 +29,7 @@ import { Textarea } from '@/components/ui/primitives'
 import { SkeletonMessage } from '@/components/ui/skeleton'
 import { AgentField } from '@/components/brand/AgentField'
 import { BrandMark } from '@/components/brand/BrandMark'
-import { ErrorBanner, MessageBubble, StickyUserAnchor } from '@/components/chat/ChatTranscript'
+import { ErrorBanner, MessageBubble } from '@/components/chat/ChatTranscript'
 import { TaskBar, parseTasks } from '@/components/chat/TaskBar'
 import { ApprovalCard, type ApprovalView } from '@/components/chat/ApprovalCard'
 import { RolePicker } from '@/components/chat/RolePicker'
@@ -133,35 +132,6 @@ function pickErrorText(err: Error): string {
     }
   }
   return err.message
-}
-
-interface TranscriptFooterContext {
-  approvals: ApprovalView[]
-  error?: string
-  onDecided: (id: string, decision: 'allowed' | 'refused' | 'expired') => void
-  /** Called when the footer changes height, so a pinned list stays pinned. */
-  onResize: () => void
-}
-
-/** The transcript's footer: pending approvals and the page error. Declared once
- *  at module level so Virtuoso never sees a new component type. */
-function TranscriptFooter({ context }: { context?: TranscriptFooterContext }) {
-  const approvals = context?.approvals ?? []
-  const error = context?.error
-  const onResize = context?.onResize
-  const onDecided = context?.onDecided
-  const shape = `${approvals.map((a) => `${a.id}:${a.decided ?? ''}`).join(',')}|${error ?? ''}`
-  useLayoutEffect(() => {
-    onResize?.()
-  }, [shape, onResize])
-  return (
-    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 pb-6 sm:px-6">
-      {onDecided
-        ? approvals.map((a) => <ApprovalCard key={a.id} approval={a} onDecided={onDecided} />)
-        : null}
-      {error ? <ErrorBanner message={error} /> : null}
-    </div>
-  )
 }
 
 export default function ChatPage() {
@@ -408,12 +378,8 @@ export default function ChatPage() {
     foregroundActiveRef.current = false
     setStreaming(false)
   }, [sessionId])
-  const virtuosoRef = useRef<VirtuosoHandle>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  // Where the list opens: the bottom of the newest message. Captured once per
-  // mount and kept as one object, because Virtuoso treats a changed value as a
-  // new anchor and would re-anchor the list mid-stream.
-  const initialIndexRef = useRef<IndexLocationWithAlign>({ index: 0, align: 'end' })
+  const transcriptBodyRef = useRef<HTMLDivElement | null>(null)
 
   // Pinning to the bottom. The page does it rather than Virtuoso's followOutput,
   // which is off: that only reacts when the item count changes (a streaming
@@ -451,6 +417,27 @@ export default function ChatPage() {
   const pinOnGrowth = useCallback(() => {
     if (followGrowthRef.current || performance.now() < followGrowthUntilRef.current) pinToBottom()
   }, [pinToBottom])
+  // The inner transcript grows when an assistant streams more tokens.
+  // Native scrolling follows that growth only while the reader stays near the
+  // bottom. Coalesce height changes into one adjustment per animation frame.
+  useEffect(() => {
+    const content = transcriptBodyRef.current
+    if (!content) return
+    let frame: number | null = null
+    const resize = new ResizeObserver(() => {
+      if (frame !== null) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        frame = null
+        pinOnGrowth()
+      })
+    })
+    resize.observe(content)
+    return () => {
+      resize.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [pinOnGrowth, loading, messages.length === 0])
+
   const bindScroller = useCallback(
     (el: HTMLElement | Window | null) => {
       unbindScrollerRef.current?.()
@@ -1170,18 +1157,9 @@ export default function ChatPage() {
     setInput(value)
   }, [historyPos])
 
-  // Virtuoso's `components` must keep a stable identity: a new Footer type
-  // unmounts and remounts the footer, resizing the scroller under itself. The
-  // footer is one component for the page's life and gets its data through
-  // Virtuoso's `context`, which re-renders it in place.
   const decideApproval = useCallback((id: string, decision: 'allowed' | 'refused' | 'expired') => {
     setApprovals((prev) => prev.map((x) => (x.id === id ? { ...x, decided: decision } : x)))
   }, [])
-  const footerContext = useMemo<TranscriptFooterContext>(
-    () => ({ approvals, error, onDecided: decideApproval, onResize: pinToBottom }),
-    [approvals, error, decideApproval, pinToBottom],
-  )
-  const virtuosoComponents = useMemo(() => ({ Footer: TranscriptFooter }), [])
 
   const newChat = () => {
     stop()
@@ -1402,40 +1380,32 @@ export default function ChatPage() {
           </div>
         </div>
       ) : (
-        // Virtualised transcript: only on-screen messages are in the DOM, so a
-        // very long session stays light. The page pins it to the bottom (see
-        // stickRef): totalListHeightChanged covers new rows and a row that grows
-        // while it streams, followOutput stays off. computeItemKey prefers the
-        // carried render key, so the end-of-turn refresh keeps every row mounted.
-        //
-        // initialTopMostItemIndex is deliberately NOT derived from messages.length
-        // here: it only defines the *initial* position, but recomputing it on every
-        // render re-anchors the list mid-stream. See initialIndexRef.
-        <div className="relative flex min-h-0 flex-1 flex-col">
-        <Virtuoso
-          ref={virtuosoRef}
-          className="min-h-0 flex-1"
-          data={transcriptTurns}
-          followOutput={false}
-          initialTopMostItemIndex={initialIndexRef.current}
-          components={virtuosoComponents}
-          context={footerContext}
-          scrollerRef={bindScroller}
-          totalListHeightChanged={editing ? undefined : pinOnGrowth}
-          computeItemKey={(i, turn) => transcriptTurnKey(turn, i)}
-          itemContent={(_, turn) => (
-            <div className="mx-auto w-full min-w-0 max-w-3xl px-4 sm:px-6">
-              {turn.user ? (
-                <StickyUserAnchor>{(compact) => renderBubble(turn.user!, compact)}</StickyUserAnchor>
-              ) : null}
-              {turn.replies.map((reply) => (
-                <div key={reply.key ?? reply.id} className="min-w-0 overflow-x-clip py-4">
-                  {renderBubble(reply)}
-                </div>
-              ))}
+        // Keep every message in a real scroll container. The old Virtuoso
+        // remeasurement and sticky prompt clipping prevented users from
+        // scrolling during live, growing assistant responses.
+        <div
+          ref={bindScroller}
+          role="log"
+          aria-label="Conversation transcript"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          style={{ overflowAnchor: 'none' }}
+        >
+          <div ref={transcriptBodyRef} className="mx-auto w-full max-w-3xl space-y-2 px-4 pb-5 sm:px-6">
+            {transcriptTurns.map((turn, i) => (
+              <div key={transcriptTurnKey(turn, i)} className="min-w-0">
+                {turn.user ? <div className="py-4">{renderBubble(turn.user)}</div> : null}
+                {turn.replies.map((reply) => (
+                  <div key={reply.key ?? reply.id} className="min-w-0 overflow-x-clip py-4">
+                    {renderBubble(reply)}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="space-y-5 py-4">
+              {approvals.map((a) => <ApprovalCard key={a.id} approval={a} onDecided={decideApproval} />)}
+              {error ? <ErrorBanner message={error} /> : null}
             </div>
-          )}
-        />
+          </div>
         </div>
       )}
 
@@ -1449,16 +1419,16 @@ export default function ChatPage() {
           viewport judder while pinned to the bottom. */}
       <div className="bg-gradient-to-t from-background via-background to-transparent px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-[max(2rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-3xl">
-          {streaming ? (
-            <div className="pb-2">
+          <div className="h-6 overflow-hidden pb-1" aria-live="polite">
+            {streaming ? (
               <StreamingIndicator
                 turn={live.turn}
                 tool={live.tool}
                 waiting={live.waiting}
                 notice={live.notice}
               />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
           {composerCard(true)}
         </div>
       </div>
@@ -1807,7 +1777,7 @@ export function StreamingIndicator({
   // design, waiting on the person. Otherwise show the running tool / step.
   if (waiting) {
     return (
-      <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden px-1 text-xs text-muted-foreground">
         <span className="size-1.5 rounded-full bg-[var(--warning)]" />
         <span className="font-medium text-foreground/70">{t('chat.waitingAnswer')}</span>
       </div>
@@ -1821,13 +1791,13 @@ export function StreamingIndicator({
         ? t('chat.workingStep', { n: turn })
         : t('chat.working')
   return (
-    <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+    <div className="flex min-w-0 items-center gap-2 overflow-hidden px-1 text-xs text-muted-foreground">
       <span className="flex items-center gap-1">
         <span className="pulse-dot size-1.5 rounded-full bg-foreground" />
         <span className="pulse-dot size-1.5 rounded-full bg-foreground [animation-delay:0.2s]" />
         <span className="pulse-dot size-1.5 rounded-full bg-foreground [animation-delay:0.4s]" />
       </span>
-      <span className="min-w-0 font-medium text-foreground/70">{label}</span>
+      <span className="min-w-0 flex-1 truncate font-medium text-foreground/70" title={label}>{label}</span>
       <span className="shrink-0 font-mono text-[10px] tabular-nums text-dim">· {secs}s</span>
     </div>
   )
