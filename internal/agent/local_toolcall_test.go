@@ -30,7 +30,7 @@ func TestNeverRecoverUnsafeOrAmbiguousPseudoCalls(t *testing.T) {
   `{"name":"web_fetch","arguments":{"url":"https://example.org"},"unexpected":true}`,
   `{"name":"web_fetch","arguments":{"url":"https://example.org"}} and something else`,
   `Sorry, can't assist with that request.`,
-  ```+`{"name":"web_fetch","arguments":{}}`+` more prose`,
+  "{\\\"name\\\":\\\"web_fetch\\\",\\\"arguments\\\":{}} more prose",
  }
  for i,content:=range unsafe{
   response:=&llm.Response{Content:content}
