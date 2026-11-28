@@ -5,9 +5,11 @@ import (
  "encoding/json"
  "net/url"
  "os"
+ "regexp"
  "strings"
 
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyprogram"
  "github.com/enowdev/antares/internal/llm"
  "github.com/enowdev/antares/internal/store"
  "github.com/enowdev/antares/internal/tools"
@@ -114,43 +116,68 @@ func scopeDocumentationReply(req Request) string {
  return "I can help with this authorized bug-bounty program. The YesWeHack link is the program description, not a confirmed in-scope testing endpoint. To start an actual assessment, configure BunnyGuard (ANTARES_BUNNY_GUARD_POLICY) with the program's allowed origins and methods, and provide an exact in-scope target URL in a Target: line plus a matching Scope: line. Once those match the approved manifest, BunnyMind can begin with a bounded scoped_read and preserve the evidence. No external scan has been started, and I will not mistake the YesWeHack platform itself for an authorized target."
 }
 
-// autoKickoff selects the restricted read tool deterministically: the
-// language model cannot delay initial action with a speculative plan.
-// All existing GateFromEnv, tool budget, audit and network controls still run.
-func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,byName map[string]tools.Tool,modelName string,emit Emit)([]llm.Message,int,error){
- if req.Quiet||req.Depth!=0||isSubordinateRun(req){return nil,0,nil}
- brief,notice:=authorizedAutoEngagement(req.Message,strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy)))
- if notice!="" {
-  if err:=emit(Event{Type:EventNotice,Message:notice});err!=nil{return nil,0,err}
-  return nil,0,nil
+var publicProgramRE=regexp.MustCompile(`https://yeswehack[.]com/programs/[A-Za-z0-9_-]{2,111}`)
+func publicProgramURL(message string) string {
+ for _,candidate:=range publicProgramRE.FindAllString(message,8){
+  if valid,err:=bunnyprogram.AllowedProgramURL(candidate);err==nil{return valid}
  }
- if brief.URL==""{return nil,0,nil}
- if _,ok:=byName["scoped_read"];!ok{
-  if err:=emit(Event{Type:EventNotice,Message:"Engagement paused: restricted HTTP tool is unavailable"});err!=nil{return nil,0,err}
-  return nil,0,nil
- }
- args,_:=json.Marshal(map[string]any{"url":brief.URL,"method":"GET","preview_bytes":2048})
- call:=llm.ToolCall{ID:newID("tool"),Name:"scoped_read",Arguments:string(args)}
- if err:=emit(Event{Type:EventNotice,Message:"Checking approved scope"});err!=nil{return nil,0,err}
- history:=[]llm.Message{{Role:llm.RoleAssistant,ToolCalls:[]llm.ToolCall{call}}}
- if !req.Quiet{
-  a.persistAssistant(ctx,sess.ID,modelName,&llm.Response{ToolCalls:[]llm.ToolCall{call}})
- }
+ return ""
+}
+
+// executeKickoff records a real tool call and response before model narration.
+// The result goes into persisted history and the same UI tool timeline.
+func (a *Agent) executeKickoff(ctx context.Context,req Request,sess *store.Session,
+ byName map[string]tools.Tool,modelName string,emit Emit,name string,args map[string]any,
+ history []llm.Message)([]llm.Message,bool,error) {
+ if _,ok:=byName[name];!ok{return history,false,nil}
+ serialized,err:=json.Marshal(args)
+ if err!=nil{return history,false,err}
+ call:=llm.ToolCall{ID:newID("tool"),Name:name,Arguments:string(serialized)}
+ if err:=emit(Event{Type:EventNotice,Message:securityActionStatus(name)});err!=nil{return history,false,err}
+ history=append(history,llm.Message{Role:llm.RoleAssistant,ToolCalls:[]llm.ToolCall{call}})
+ if !req.Quiet{a.persistAssistant(ctx,sess.ID,modelName,&llm.Response{ToolCalls:[]llm.ToolCall{call}})}
  results:=a.executeTools(ctx,[]llm.ToolCall{call},byName,req,sess,emit)
  for _,out:=range results{
-  if !req.Quiet{
+  if !req.Quiet {
    if err:=a.db.AppendMessage(ctx,&store.Message{
     ID:newID("msg"),SessionID:sess.ID,Role:store.RoleTool,
     Content:out.message.Content,ToolCallID:out.message.ToolCallID,ToolName:out.message.Name,
     Meta:store.Meta{"is_error":out.isError},
-   });err!=nil{return nil,1,err}
+   });err!=nil{return history,true,err}
   }
  }
  history=appendTurnMessages(history,results,"",nil)
- if len(results)>0&&results[0].isError{
-  if err:=emit(Event{Type:EventNotice,Message:"Initial inspection blocked"});err!=nil{return history,1,err}
- }else{
-  if err:=emit(Event{Type:EventNotice,Message:"Initial inspection recorded; continuing investigation"});err!=nil{return history,1,err}
+ return history,true,nil
+}
+
+// autoKickoff selects the restricted read tool deterministically: the
+// language model cannot delay initial action with a speculative plan.
+// All existing GateFromEnv, tool budget, audit and network controls still run.
+func (a *Agent) autoKickoff(ctx context.Context,req Request,sess *store.Session,
+ byName map[string]tools.Tool,modelName string,emit Emit)([]llm.Message,int,error) {
+ if req.Quiet||req.Depth!=0||isSubordinateRun(req){return nil,0,nil}
+ history:=[]llm.Message{}
+ count:=0
+ if program:=publicProgramURL(req.Message);program!="" {
+  next,ran,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+   "program_intake",map[string]any{"url":program},history)
+  if err!=nil{return next,count,err}
+  history=next
+  if ran{count++}
  }
- return history,1,nil
+ brief,notice:=authorizedAutoEngagement(req.Message,strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy)))
+ if notice!=""{
+  if err:=emit(Event{Type:EventNotice,Message:notice});err!=nil{return history,count,err}
+  return history,count,nil
+ }
+ if brief.URL==""{return history,count,nil}
+ if _,ok:=byName["scoped_read"];!ok {
+  if err:=emit(Event{Type:EventNotice,Message:"Engagement paused: scoped_read is unavailable"});err!=nil{return history,count,err}
+  return history,count,nil
+ }
+ next,ran,err:=a.executeKickoff(ctx,req,sess,byName,modelName,emit,
+  "scoped_read",map[string]any{"url":brief.URL,"method":"GET","preview_bytes":2048},history)
+ if err!=nil{return next,count,err}
+ if ran{count++}
+ return next,count,nil
 }
