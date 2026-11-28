@@ -9,6 +9,7 @@ import (
 )
 func fixture(t *testing.T,max int)(*Guard,string){
  t.Helper()
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  path:=filepath.Join(t.TempDir(),"policy.json")
  b,_:=json.Marshal(Policy{EngagementID:"local-lab",AllowedOrigins:[]string{"http://127.0.0.1:8765"},AllowedMethods:[]string{"GET","POST"},MaxNetworkCalls:max})
  if err:=os.WriteFile(path,b,0600);err!=nil{t.Fatal(err)}
@@ -60,6 +61,7 @@ func TestInvalidManifestRejected(t *testing.T){
 }
 
 func TestGateFromEnvDoesNotReusePreviousEngagement(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  first:=filepath.Join(t.TempDir(),"first.json")
  second:=filepath.Join(t.TempDir(),"second.json")
  write:=func(path,engagement,origin string){
@@ -86,6 +88,7 @@ func TestGateFromEnvDoesNotReusePreviousEngagement(t *testing.T){
  }
 }
 func TestGateFromEnvReloadsChangedAllowlist(t *testing.T){
+ t.Setenv("BUNNY_SHARED_QUOTA_ROOT",t.TempDir())
  path:=filepath.Join(t.TempDir(),"policy.json")
  write:=func(origin string){
   data,_:=json.Marshal(Policy{EngagementID:"same_lab",
