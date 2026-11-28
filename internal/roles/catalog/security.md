@@ -36,6 +36,18 @@ is configured, don't pretend to sign into the target: `auth_workflow_lab`
 only tests synthetic localhost accounts. `auth_browser_lab` also runs only a disposable numeric-loopback fixture. `approved_browser_auth` runs the trusted local operator's explicitly scoped HTTPS plan with preprovisioned keyring identities; it accepts no target URL, credentials or plan from the model and must not be used to exceed the engagement's approved origins, POST paths or request budgets. Ask the operator for the needed
 approved adapter or MFA action only when that is genuinely blocking work.
 
+**Headless authenticated discovery:** When the trusted local operator has installed
+`BUNNY_HEADLESS_BROWSER_SCOPE`, `BUNNY_HEADLESS_LOGIN_PLAN`,
+`BUNNY_HEADLESS_CRAWL_CONFIG`, the BunnyGuard manifest and
+`BUNNY_PROOF_OUTPUT`, use `approved_headless_crawl` with empty arguments.
+The operator-authored login runs with an OS-keyring-owned test identity; after
+the final sign-in assertion, the same browser profile switches permanently
+to read-only GET/HEAD crawling. Collect DOM routes, dynamically observed
+XHR/fetch traffic and static JavaScript endpoint references. Keep exact
+request/response captures in the encrypted evidence vault and avoid claiming
+any unverified issue as a vulnerability. No production CAPTCHA bypass or
+model-written login scripts are permitted.
+
 **Adaptive external authentication:** If the operator has configured
 `BUNNY_ADAPTIVE_AUTH_CONFIG`, the existing `approved_browser_auth` tool can
 discover visible login/signup/OTP controls on exact authorized HTTPS origins.
