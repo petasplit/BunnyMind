@@ -38,7 +38,7 @@ type HeadlessEndpoint struct {
 }
 type HeadlessPage struct {
  Path string `json:"path"`
- TitleSHA256 string `json:"title_sha256"`
+ PathSHA256 string `json:"path_sha256"`
  DiscoveredLinks int `json:"discovered_links"`
  ObservedRequests int `json:"observed_requests"`
  ScriptBodiesInspected int `json:"script_bodies_inspected"`
@@ -91,7 +91,7 @@ func cleanedPath(uri string)string{
  if p==""{p="/"}
  segments:=strings.Split(p,"/")
  for i,x:=range segments{
-  if len(x)>32||(len(x)>12&&isOnlyDigits(x)){segments[i]="{id}"}
+  if len(x)>32||(len(x)>=6&&isOnlyDigits(x)){segments[i]="{id}"}
  }
  return strings.Join(segments,"/")
 }
@@ -114,6 +114,7 @@ func appendEndpoint(report *HeadlessReport,seen map[string]bool,origin,raw,metho
  })
 }
 func scriptFromBody(raw,kind string)(string,bool){
+ if len(raw)>64*1024{return "",false}
  if strings.HasPrefix(kind,"application/base64;"){
   blob,err:=base64.StdEncoding.DecodeString(raw)
   if err!=nil||len(blob)>48*1024{return "",false}
@@ -190,7 +191,7 @@ func crawlRendered(ctx context.Context,d headlessDriver,cfg HeadlessCrawlConfig,
    }
   }
   for _,v:=range discovery.ScriptURLs{appendEndpoint(&report,seenEndpoints,cfg.Origin,v,"GET","script_src")}
-  one.TitleSHA256=digestHeadless(one.Path) // no page text or title is persisted
+  one.PathSHA256=digestHeadless(one.Path) // no page text or title is persisted
   report.Pages=append(report.Pages,one)
  }
  sort.Slice(report.Endpoints,func(i,j int)bool{
