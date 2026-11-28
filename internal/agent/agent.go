@@ -510,6 +510,19 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		if err != nil {
 			return nil, err
 		}
+		// Some local OpenAI-compatible models print a JSON tool call as
+		// assistant text instead of returning the native tool_calls field.
+		// Recover only exact read-only calls on the first model turn and
+		// never treat prose, shell code or arbitrary target requests as tools.
+		// A streamed pseudo-call is reset before the actual tool event.
+		if turn==1 && totalToolCalls==0 && recoverReadOnlyToolCall(resp, func(name string) bool {
+			_, ok := byName[name]
+			return ok
+		}) {
+			if !suppressToolNarration {
+				if err := emit(Event{Type: EventReset}); err != nil { return nil, err }
+			}
+		}
 		if suppressToolNarration {
 			if len(resp.ToolCalls) > 0 {
 				// No introductory essay should appear in the UI or in the
