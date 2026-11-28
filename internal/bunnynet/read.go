@@ -97,7 +97,7 @@ func (r *Reader) Read(ctx context.Context,rawURL,method string,previewBytes int)
 // this method never follows a redirect, accesses cookies, or relaxes DNS policy.
 func (r *Reader) ReadDocument(ctx context.Context,rawURL,agent string,maxBody int)(Result,[]byte,error){
  if maxBody<1||maxBody>512*1024{return Result{},nil,errors.New("document limit must be 1..512 KiB")}
- if len(agent)<5||len(agent)>160||strings.ContainsAny(agent,"\\r\\n"){return Result{},nil,errors.New("invalid user agent")}
+ if len(agent)<5||len(agent)>160||strings.ContainsAny(agent,"\r\n"){return Result{},nil,errors.New("invalid user agent")}
  return r.readPayload(ctx,rawURL,"GET",maxBody,agent)
 }
 func (r *Reader) readPayload(ctx context.Context,rawURL,method string,maxBody int,userAgent string)(Result,[]byte,error){
