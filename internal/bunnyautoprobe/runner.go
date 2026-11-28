@@ -53,6 +53,7 @@ func (r Runner) Execute(ctx context.Context,s Spec,policy bunnyguard.Policy)(Cam
  // This is a bounded online run, not a scheduled background operation.
  ctx,cancel:=context.WithTimeout(ctx,10*time.Minute)
  defer cancel()
+ if err:=os.MkdirAll(r.Proof.Root,0700);err!=nil{return CampaignResult{},err}
  folder:=filepath.Join(r.Proof.Root,s.CampaignID)
  if err:=os.Mkdir(folder,0700);err!=nil{return CampaignResult{},err}
  cfg,err:=json.MarshalIndent(s,"","  ")
