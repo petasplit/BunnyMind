@@ -515,7 +515,7 @@ func (a *Agent) run(ctx context.Context, req Request, emit Emit) (result *Result
 		// Recover only exact read-only calls on the first model turn and
 		// never treat prose, shell code or arbitrary target requests as tools.
 		// A streamed pseudo-call is reset before the actual tool event.
-		if turn==1 && totalToolCalls==0 && recoverReadOnlyToolCall(resp, func(name string) bool {
+		if turn==1 && totalToolCalls==0 && (!securityAssessmentRequest(req) || readySecurityMission(req)) && recoverReadOnlyToolCall(resp, func(name string) bool {
 			_, ok := byName[name]
 			return ok
 		}) {
