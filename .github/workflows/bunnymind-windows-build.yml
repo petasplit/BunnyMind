@@ -40,6 +40,8 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p dist
+          find web/dist/assets -maxdepth 1 -name 'ChatPage-*.js' -printf '%f\n' > dist/CHAT_CHUNKS.txt
+          test -s dist/CHAT_CHUNKS.txt
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-windows-x64.exe ./cmd/antares
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-authz-demo-windows-x64.exe ./cmd/bunnyauthz-demo
           go build -trimpath -ldflags "-s -w" -o dist/BunnyMind-fix-demo-windows-x64.exe ./cmd/bunnyfix-demo
@@ -59,6 +61,7 @@ jobs:
             dist/BunnyMind-python-proof-windows-x64.exe
             dist/BunnyMind-adaptive-proof-windows-x64.exe
             dist/SHA256SUMS.txt
+            dist/CHAT_CHUNKS.txt
           retention-days: 7
 
   windows-native-smoke:
@@ -152,7 +155,22 @@ jobs:
             if ($dashboard.StatusCode -ne 200 -or -not $dashboard.Content) {
               throw 'Embedded web dashboard was not served successfully'
             }
-            Write-Host 'PASS: Actual Windows x64 backend started, returned /api/health OK, and served embedded web dashboard'
+            $chunks = @(Get-Content (Join-Path $PWD 'dist/CHAT_CHUNKS.txt') | Where-Object { $_.Trim() })
+            if ($chunks.Count -lt 1) { throw 'No ChatPage dynamic-import chunks in Windows build' }
+            foreach ($chunk in $chunks) {
+              $asset = Invoke-WebRequest -Uri ("http://127.0.0.1:18787/assets/" + $chunk) -UseBasicParsing -TimeoutSec 15
+              if ($asset.StatusCode -ne 200 -or
+                  $asset.Headers['Content-Type'] -notmatch 'javascript' -or
+                  $asset.Content -match '<!doctype html>') {
+                throw "ChatPage asset $chunk was not served as a JavaScript module"
+              }
+            }
+            $staleAsset = Invoke-WebRequest -Uri 'http://127.0.0.1:18787/assets/ChatPage-nonexistent.js' -UseBasicParsing -SkipHttpErrorCheck -TimeoutSec 15
+            if ($staleAsset.StatusCode -ne 404 -or $staleAsset.Content -match '<!doctype html>') {
+              throw 'A missing hashed JavaScript module was incorrectly replaced by SPA HTML'
+            }
+            Write-Host 'PASS: Actual Windows x64 backend started, served healthy API, embedded dashboard and dynamic ChatPage JavaScript chunks'
+
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
           }
