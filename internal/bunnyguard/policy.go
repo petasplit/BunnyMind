@@ -27,6 +27,7 @@ type Policy struct {
  AllowedMethods []string `json:"allowed_methods,omitempty"`
  MaxNetworkCalls int `json:"max_network_calls"`
  MinIntervalMS int `json:"min_interval_ms,omitempty"`
+ UserAgent string `json:"user_agent,omitempty"`
  AuditPath string `json:"audit_path,omitempty"`
 }
 type Decision struct { Allowed bool; Reason string }
@@ -77,6 +78,7 @@ func New(path string) (*Guard,error) {
  if strings.TrimSpace(p.EngagementID)=="" || len(p.AllowedOrigins)==0{return nil,errors.New("engagement_id and allowed_origins required")}
  if p.MaxNetworkCalls<1 || p.MaxNetworkCalls>100000 {return nil,errors.New("invalid request budget")}
  if p.MinIntervalMS<0 || p.MinIntervalMS>3600000 {return nil,errors.New("invalid minimum interval")}
+ if len(p.UserAgent)>160||strings.ContainsAny(p.UserAgent,"\r\n"){return nil,errors.New("invalid assessment User-Agent")}
  if len(p.AllowedCIDRs)>16{return nil,errors.New("too many CIDR exceptions")}
  for _,cidr:=range p.AllowedCIDRs{
   _,block,err:=net.ParseCIDR(cidr)
@@ -178,6 +180,57 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
    d.Reason="trusted Python proof plan or output vault not configured"
   }else{
    d=Decision{Allowed:true,Reason:"operator-configured bounded Python evidence capture"}
+  }
+ case "program_intake":
+  // Public policy retrieval is constrained to the YesWeHack program host.
+  // It consumes one audited network operation, but never grants access
+  // to any linked application or third-party endpoint.
+  network=true
+  var input struct{ URL string `json:"url"` }
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&input);err!=nil{d.Reason="invalid program URL arguments";break}
+  u,err:=url.Parse(input.URL)
+  if err!=nil||u==nil||u.Scheme!="https"||!strings.EqualFold(u.Host,"yeswehack.com")||
+   !strings.HasPrefix(u.Path,"/programs/")||u.RawQuery!=""||u.Fragment!=""{
+   d.Reason="public program intake only permits yeswehack.com program pages"
+  }else{
+   origin="https://yeswehack.com"
+   d=Decision{Allowed:true,Reason:"public program documentation fetch"}
+  }
+ case "passive_subdomains":
+  network=true
+  var input struct{Domain string `json:"domain"`}
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&input);err!=nil{d.Reason="invalid passive CT arguments";break}
+  host:=strings.TrimSuffix(strings.ToLower(strings.TrimSpace(input.Domain)),".")
+  if len(host)<4||len(host)>170||strings.HasPrefix(host,"localhost")||
+   net.ParseIP(host)!=nil||strings.ContainsAny(host," /:@\\?#")||!strings.Contains(host,"."){
+   d.Reason="invalid passive CT domain"
+  }else{
+   origin="https://crt.sh"
+   d=Decision{Allowed:true,Reason:"public certificate transparency metadata"}
+  }
+ case "scoped_crawl":
+  network=true
+  var argsObj struct{
+   URL string `json:"url"`
+   MaxPages int `json:"max_pages"`
+   MaxDepth int `json:"max_depth"`
+  }
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&argsObj);err!=nil{d.Reason="invalid crawler arguments";break}
+  var e error;origin,e=parsedOrigin(argsObj.URL,false)
+  maxPages:=argsObj.MaxPages
+  if maxPages==0{maxPages=8}
+  if e!=nil||!g.origins[origin]{
+   d.Reason="crawl seed outside exact approved origin"
+  }else if !g.methods["GET"]{
+   d.Reason="crawl requires approved GET method"
+  }else if maxPages<1||maxPages>16||maxPages>g.policy.MaxNetworkCalls||
+   argsObj.MaxDepth<0||argsObj.MaxDepth>3{
+   d.Reason="crawl limits exceed approved budget or depth"
+  }else{
+   d=Decision{Allowed:true,Reason:"bounded operator-approved same-origin GET crawler"}
   }
  case "scoped_read":
   network=true

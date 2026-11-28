@@ -82,12 +82,30 @@ func (r *Reader) allowedTarget(raw string)(*url.URL,string,error){
 // validated after DNS lookup, without an environment proxy. It only permits
 // GET/HEAD; each call opens a fresh transport without pooled DNS state.
 func (r *Reader) Read(ctx context.Context,rawURL,method string,previewBytes int)(Result,error){
- u,origin,err:=r.allowedTarget(rawURL)
+ if previewBytes<0||previewBytes>8192{return Result{},errors.New("preview_bytes must be 0..8192")}
+ result,payload,err:=r.readPayload(ctx,rawURL,method,MaxBody,"BunnyMind-ScopedRead/0.5 (authorized testing)")
  if err!=nil{return Result{},err}
+ if previewBytes>len(payload){previewBytes=len(payload)}
+ if previewBytes>0{
+  result.Preview=strings.ToValidUTF8(string(payload[:previewBytes]),"�")
+  if !utf8.ValidString(result.Preview){result.Preview=""}
+ }
+ return result,nil
+}
+// ReadDocument returns bounded page bytes for a trusted on-disk parser.
+// The caller must enforce the same preapproved scope as any other request;
+// this method never follows a redirect, accesses cookies, or relaxes DNS policy.
+func (r *Reader) ReadDocument(ctx context.Context,rawURL,agent string,maxBody int)(Result,[]byte,error){
+ if maxBody<1||maxBody>512*1024{return Result{},nil,errors.New("document limit must be 1..512 KiB")}
+ if len(agent)<5||len(agent)>160||strings.ContainsAny(agent,"\r\n"){return Result{},nil,errors.New("invalid user agent")}
+ return r.readPayload(ctx,rawURL,"GET",maxBody,agent)
+}
+func (r *Reader) readPayload(ctx context.Context,rawURL,method string,maxBody int,userAgent string)(Result,[]byte,error){
+ u,origin,err:=r.allowedTarget(rawURL)
+ if err!=nil{return Result{},nil,err}
  method=strings.ToUpper(strings.TrimSpace(method))
  if method==""{method="GET"}
- if method!="GET"&&method!="HEAD"{return Result{},errors.New("scoped reader permits GET/HEAD only")}
- if previewBytes<0||previewBytes>8192{return Result{},errors.New("preview_bytes must be 0..8192")}
+ if method!="GET"&&method!="HEAD"{return Result{},nil,errors.New("scoped reader permits GET/HEAD only")}
  targetLiteral:=net.ParseIP(u.Hostname())
  d:=&net.Dialer{Timeout:4*time.Second}
  transport:=&http.Transport{
@@ -128,26 +146,20 @@ func (r *Reader) Read(ctx context.Context,rawURL,method string,previewBytes int)
   },
  }
  request,err:=http.NewRequestWithContext(ctx,method,u.String(),nil)
- if err!=nil{return Result{},err}
- request.Header.Set("User-Agent","BunnyMind-ScopedRead/0.5 (authorized testing)")
+ if err!=nil{return Result{},nil,err}
+ request.Header.Set("User-Agent",userAgent)
  response,err:=client.Do(request)
- if err!=nil{return Result{},err}
+ if err!=nil{return Result{},nil,err}
  defer response.Body.Close()
- payload,err:=io.ReadAll(io.LimitReader(response.Body,MaxBody+1))
- if err!=nil{return Result{},err}
- truncated:=len(payload)>MaxBody
- if truncated{payload=payload[:MaxBody]}
+ payload,err:=io.ReadAll(io.LimitReader(response.Body,int64(maxBody)+1))
+ if err!=nil{return Result{},nil,err}
+ truncated:=len(payload)>maxBody
+ if truncated{payload=payload[:maxBody]}
  hash:=sha256.Sum256(payload)
  output:=Result{
   Status:response.StatusCode,Origin:origin,ContentType:response.Header.Get("Content-Type"),
   BodySHA256:hex.EncodeToString(hash[:]),BytesRead:len(payload),
   Truncated:truncated,RedirectBlocked:response.StatusCode>=300&&response.StatusCode<400&&response.Header.Get("Location")!="",
  }
- if previewBytes>0{
-  if previewBytes>len(payload){previewBytes=len(payload)}
-  preview:=payload[:previewBytes]
-  output.Preview=strings.ToValidUTF8(string(preview),"�")
-  if !utf8.ValidString(output.Preview){output.Preview=""}
- }
- return output,nil
+ return output,payload,nil
 }

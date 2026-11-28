@@ -357,6 +357,22 @@ export function AppShell() {
 
   useEffect(() => setDrawerOpen(false), [location.pathname])
 
+  useEffect(() => {
+    if (isDesktop || !drawerOpen) return
+    // A modal navigation drawer must not allow the page behind it to scroll
+    // or leave keyboard users stranded until they select a route.
+    const previous=document.body.style.overflow
+    document.body.style.overflow='hidden'
+    const onEscape=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();setDrawerOpen(false)}
+    }
+    window.addEventListener('keydown',onEscape)
+    return ()=>{
+      document.body.style.overflow=previous
+      window.removeEventListener('keydown',onEscape)
+    }
+  }, [isDesktop,drawerOpen])
+
   const activeHub = hubFor(location.pathname)
   // More reads as active on any hub the bar does not show directly.
   const moreActive = activeHub !== undefined && !BOTTOM_BAR_HUBS.some((h) => h.id === activeHub)
@@ -404,7 +420,7 @@ export function AppShell() {
                 className="m-fade absolute inset-0 bg-[#04050699] backdrop-blur-[4px]"
                 onClick={() => setDrawerOpen(false)}
               />
-              <div className="m-slide absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col border-r border-line bg-sidebar shadow-2xl">
+              <div id="app-mobile-drawer" role="dialog" aria-modal="true" aria-label={t('nav.openMenu')} className="m-slide absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col border-r border-line bg-sidebar shadow-2xl">
                 <div className="flex items-center justify-between px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1.5rem)]">
                   <div className="flex items-center gap-2.5">
                     <AntaresMark />
@@ -432,6 +448,8 @@ export function AppShell() {
                 className="rounded-full"
                 onClick={() => setDrawerOpen(true)}
                 aria-label={t('nav.openMenu')}
+                aria-expanded={drawerOpen}
+                aria-controls="app-mobile-drawer"
               >
                 <List />
               </Button>
