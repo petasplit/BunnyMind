@@ -210,6 +210,28 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
    origin="https://crt.sh"
    d=Decision{Allowed:true,Reason:"public certificate transparency metadata"}
   }
+ case "scoped_crawl":
+  network=true
+  var argsObj struct{
+   URL string `json:"url"`
+   MaxPages int `json:"max_pages"`
+   MaxDepth int `json:"max_depth"`
+  }
+  dec:=json.NewDecoder(strings.NewReader(args));dec.DisallowUnknownFields()
+  if err:=dec.Decode(&argsObj);err!=nil{d.Reason="invalid crawler arguments";break}
+  var e error;origin,e=parsedOrigin(argsObj.URL,false)
+  maxPages:=argsObj.MaxPages
+  if maxPages==0{maxPages=8}
+  if e!=nil||!g.origins[origin]{
+   d.Reason="crawl seed outside exact approved origin"
+  }else if !g.methods["GET"]{
+   d.Reason="crawl requires approved GET method"
+  }else if maxPages<1||maxPages>16||maxPages>g.policy.MaxNetworkCalls||
+   argsObj.MaxDepth<0||argsObj.MaxDepth>3{
+   d.Reason="crawl limits exceed approved budget or depth"
+  }else{
+   d=Decision{Allowed:true,Reason:"bounded operator-approved same-origin GET crawler"}
+  }
  case "scoped_read":
   network=true
   var m map[string]json.RawMessage
