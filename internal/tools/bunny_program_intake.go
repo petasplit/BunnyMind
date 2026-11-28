@@ -5,6 +5,7 @@ import (
  "encoding/json"
 
  "github.com/enowdev/antares/internal/bunnyprogram"
+ "github.com/enowdev/antares/internal/config"
 )
 
 // programIntakeTool reads public program rules (not an application endpoint).
@@ -34,6 +35,14 @@ func (programIntakeTool) Execute(ctx context.Context,in Input)Result{
  snapshot,err:=bunnyprogram.Fetch(ctx,args.URL)
  if err!=nil{return Errorf("public program retrieval unavailable: %v",err)}
  if in.Emit!=nil{in.Emit(Progress{Tool:"program_intake",Message:"Extracted scope, exclusions and testing precautions"})}
+ if proposed,e:=bunnyprogram.Draft(snapshot);e==nil{
+  if filename,e:=bunnyprogram.SaveProposal(config.Path("bunnymind","program-proposals"),proposed);e==nil{
+   snapshot.ScopeProposalFile=filename
+   snapshot.Notes=append(snapshot.Notes,"An inactive scope proposal was saved. Review and narrow it before activation; this tool never applies it.")
+  }else{
+   snapshot.Notes=append(snapshot.Notes,"Scope proposal could not be saved; inspect the verified scope entries.")
+  }
+ }
  raw,err:=json.MarshalIndent(snapshot,"","  ")
  if err!=nil{return Errorf("cannot serialize public program rules")}
  return Text(string(raw))
