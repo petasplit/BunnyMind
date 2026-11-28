@@ -7,6 +7,7 @@ import (
 
  "github.com/enowdev/antares/internal/bunnyegress"
  "github.com/enowdev/antares/internal/bunnyguard"
+ "github.com/enowdev/antares/internal/bunnyquota"
 )
 
 // LoadAdaptiveConfiguration verifies all three operator-owned files before
@@ -30,6 +31,11 @@ func LoadAdaptiveConfiguration(scopeFile,adaptiveFile,guardFile string)(Approved
 func RunConfiguredAdaptive(ctx context.Context,scope ApprovedScope,cfg AdaptiveConfig,
  secrets Secrets,operator Handoff,manifest bunnyguard.Policy,headless bool)(Result,error){
  if err:=ValidateAdaptive(cfg,scope,manifest);err!=nil{return Result{},err}
+ release,err:=bunnyquota.ExecutionLeaseShared(ctx,manifest.EngagementID)
+ if err!=nil{return Result{},err}
+ defer release()
+ if _,err:=bunnyquota.ReserveShared(ctx,manifest.EngagementID,
+  scope.MaxBrowserRequests*len(cfg.Actors),manifest.MaxNetworkCalls);err!=nil{return Result{},err}
  if secrets==nil{return Result{},errors.New("trusted test-account credentials missing")}
  egress,err:=bunnyegress.New(bunnyegress.Config{
   Origins:scope.AllowedOrigins,MaxTunnels:scope.MaxTunnels,
