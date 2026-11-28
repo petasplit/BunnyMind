@@ -50,7 +50,13 @@ func RootsForProgram(entries []string)[]string {
   fields:=strings.Fields(entry)
   if len(fields)==0{continue}
   first:=strings.TrimSpace(fields[0])
-  if u,err:=url.Parse(first);err==nil&&u.Scheme!="" {first=u.Hostname()}
+  // Mobile app-store links are not domains owned by the program operator.
+  if strings.Contains(strings.ToLower(entry),"mobile application") {continue}
+  if u,err:=url.Parse(first);err==nil&&u.Scheme!="" {
+   host:=strings.ToLower(u.Hostname())
+   if host=="apps.apple.com"||host=="play.google.com"{continue}
+   first=host
+  }
   first=strings.TrimPrefix(first,"*.")
   variants:=[]string{first}
   if part:=altTLDRE.FindString(first);part!="" {
@@ -71,7 +77,7 @@ func RootsForProgram(entries []string)[]string {
   }
  }
  sort.Strings(roots)
- if len(roots)>5{roots=roots[:5]}
+ if len(roots)>12{roots=roots[:12]}
  return roots
 }
 func FilterCTNames(domain string,raw []byte,max int)([]string,error){
