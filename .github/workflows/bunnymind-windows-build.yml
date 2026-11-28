@@ -174,6 +174,29 @@ jobs:
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
           }
+      - name: Start and stop the actual BunnyMind Windows background daemon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'dist/BunnyMind-windows-x64.exe'
+          $env:ANTARES_HOME = Join-Path $env:RUNNER_TEMP 'bunnymind-daemon-smoke-home'
+          $env:ANTARES_HOST = '127.0.0.1'
+          $env:ANTARES_PORT = '18788'
+          $env:ANTARES_DISABLE_MODELS_FETCH = '1'
+          & $exe serve
+          if ($LASTEXITCODE -ne 0) { throw 'Windows background daemon failed to start' }
+          try {
+            $status = (& $exe status | Out-String)
+            if ($LASTEXITCODE -ne 0 -or $status -notmatch 'running') {
+              throw 'Windows process identity check rejected a running daemon'
+            }
+            $health = Invoke-RestMethod -Uri 'http://127.0.0.1:18788/api/health' -TimeoutSec 8
+            if ($health.ok -ne $true) { throw 'Windows daemon did not serve the health endpoint' }
+            Write-Host 'PASS: Windows background daemon process identity, status command and API health'
+          } finally {
+            & $exe stop
+            if ($LASTEXITCODE -ne 0) { throw 'Windows daemon stop failed' }
+          }
       - name: Run secure and deliberately vulnerable localhost scenarios
         shell: pwsh
         run: |
