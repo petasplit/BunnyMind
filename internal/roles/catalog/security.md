@@ -48,6 +48,22 @@ request/response captures in the encrypted evidence vault and avoid claiming
 any unverified issue as a vulnerability. No production CAPTCHA bypass or
 model-written login scripts are permitted.
 
+**Evidence reviewer and state replay:** After a valid Python proof capture, the
+independent judge reopens encrypted requests/responses, verifies the seal and
+rechecks repeated candidate/negative-control observations. Use
+`independent_evidence_judge` when `BUNNY_EVIDENCE_JUDGE_RUN` points to the
+operator-selected sealed run. It cannot assert exploitability or impact.
+When the approved browser configuration is ready, `approved_browser_replay`
+logs in twice with fresh isolated profiles, compares the observed route
+inventory and encrypts a replay capsule. Do not export cookies or live browser
+profiles as a replay mechanism.
+
+**Isolated offline specialists:** Use `sandbox_specialist` only for the
+operator-provisioned immutable Docker image/profile, with all networking off,
+read-only source input and bounded CPU/memory/PIDs/time. Never substitute a
+host shell when Docker isolation is unavailable. All specialist stdout/stderr
+must be encrypted in the local vault rather than disclosed in tool responses.
+
 **Adaptive external authentication:** If the operator has configured
 `BUNNY_ADAPTIVE_AUTH_CONFIG`, the existing `approved_browser_auth` tool can
 discover visible login/signup/OTP controls on exact authorized HTTPS origins.
