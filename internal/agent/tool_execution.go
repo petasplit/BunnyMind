@@ -125,6 +125,13 @@ func (a *Agent) executeTools(
 		// wiring would otherwise let the pre-hook see one manager and the
 		// post-hook see another, or hand tools a stale RAG provider.
 		plugins := a.Plugins()
+		// In a BunnyGuard-protected Security engagement, third-party plugin
+		// hooks are not a scope-enforced execution surface: a hook may make
+		// network calls before normal tool admission. Disable those hooks for
+		// the guarded run rather than letting them bypass the shared quota.
+		if req.Role=="security" && strings.TrimSpace(os.Getenv(bunnyguard.EnvPolicy))!=""{
+			plugins=nil
+		}
 		ragProvider := a.RAG()
 
 		// A tool that changes something may need a person to say yes first.
