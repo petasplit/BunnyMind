@@ -1,0 +1,65 @@
+package bunnyprogram
+
+import (
+ "net"
+ "net/url"
+ "sort"
+ "strings"
+)
+
+// ExactWebOrigins extracts explicit first-party web hostnames from scope rows.
+// A wildcard scope is deliberately NOT expanded into arbitrary subdomains.
+// Parenthesized *finite TLD alternatives* are enumerated as exact hostnames,
+// and mobile app-store links are not accepted as scan seeds.
+func ExactWebOrigins(entries []string)[]string {
+ seen:=map[string]bool{}
+ for _,entry:=range entries{
+  if strings.Contains(strings.ToLower(entry),"mobile application"){continue}
+  fields:=strings.Fields(entry)
+  if len(fields)==0{continue}
+  item:=fields[0]
+  if strings.HasPrefix(item,"*.")||strings.Contains(item,"*"){continue}
+  if strings.Contains(item,"(")&&strings.Contains(item,")"){
+   a:=strings.Index(item,"(");b:=strings.Index(item[a:],")")
+   if b<=0{continue}
+   b+=a
+   options:=strings.Split(item[a+1:b],"|")
+   if len(options)<2||len(options)>8{continue}
+   for _,suffix:=range options{
+    if len(suffix)<2||len(suffix)>10{continue}
+    host:=item[:a]+suffix+item[b+1:]
+    addExact(seen,host)
+   }
+   continue
+  }
+  addExact(seen,item)
+ }
+ list:=[]string{}
+ for v:=range seen{list=append(list,v)}
+ sort.Strings(list)
+ if len(list)>32{list=list[:32]}
+ return list
+}
+func addExact(seen map[string]bool,input string){
+ if !strings.Contains(input,"://"){input="https://"+input}
+ u,err:=url.Parse(input)
+ if err!=nil||u==nil||u.Scheme!="https"||u.User!=nil||
+  u.Hostname()==""||u.Port()!=""||u.RawQuery!=""||u.Fragment!=""||
+  (u.Path!=""&&u.Path!="/")||strings.ContainsAny(u.Hostname(),"()|*\\@")||
+  net.ParseIP(u.Hostname())!=nil{return}
+ hostname:=strings.ToLower(u.Hostname())
+ if hostname=="apps.apple.com"||hostname=="play.google.com"{return}
+ seen["https://"+hostname]=true
+}
+// ApprovedIntersection does not grant approval: it only intersects
+// independently configured manifest origins with finite program scope rows.
+// Any nonempty exclusions require review; the source program may exclude
+// categories (e.g. customer-specific hosts) that cannot be verified from DNS.
+func ApprovedIntersection(exact []string,operatorOrigins []string,exclusions []string)[]string{
+ if len(exclusions)>0{return nil} // exclusions must be reconciled by operator
+ allowed:=map[string]bool{}
+ for _,item:=range operatorOrigins{allowed[strings.ToLower(strings.TrimSuffix(item,"/"))]=true}
+ out:=[]string{}
+ for _,o:=range exact{if allowed[o]{out=append(out,o)}}
+ return out
+}
