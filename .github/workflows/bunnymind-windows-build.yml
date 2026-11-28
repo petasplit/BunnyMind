@@ -65,6 +65,7 @@ jobs:
     needs: windows-x64
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Download compiled Windows executables
         uses: actions/download-artifact@v4
         with:
