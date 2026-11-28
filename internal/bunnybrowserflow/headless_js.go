@@ -33,9 +33,9 @@ const discoveryJS = `(() => {
 })()`
 
 var jsPathPatterns = []*regexp.Regexp{
- regexp.MustCompile(`(?i)\b(?:fetch|axios\.(?:get|post|put|delete|patch)|import)\s*\(\s*["'`](/[^"'`\s?#]{1,180})["'`]`),
- regexp.MustCompile(`(?i)\b(?:url|endpoint|path|baseURL)\s*[:=]\s*["'`](/(?:api|graphql|v[0-9]+|internal|rest)/[^"'`\s?#]{0,180})["'`]`),
- regexp.MustCompile(`(?i)\b(?:fetch|open)\s*\(\s*["'`](https?://[^"'`\s?#]{1,240})["'`]`),
+ regexp.MustCompile(`(?i)\b(?:fetch|axios\.(?:get|post|put|delete|patch)|import)\s*\(\s*["'](/[^"'\s?#]{1,180})["']`),
+ regexp.MustCompile(`(?i)\b(?:url|endpoint|path|baseURL)\s*[:=]\s*["'](/(?:api|graphql|v[0-9]+|internal|rest)/[^"'\s?#]{0,180})["']`),
+ regexp.MustCompile(`(?i)\b(?:fetch|open)\s*\(\s*["'](https?://[^"'\s?#]{1,240})["']`),
 }
 func parseDiscovery(raw []byte)(BrowserDiscovery,error){
  var d BrowserDiscovery
