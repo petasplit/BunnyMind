@@ -71,12 +71,14 @@ func jsonHash(v any)(string,error){
  return hex.EncodeToString(sum[:]),nil
 }
 func replayWith(ctx context.Context,scope ApprovedScope,login Plan,cfg HeadlessCrawlConfig,
- manifest bunnyguard.Policy,root string,runner func(context.Context)(HeadlessReport,error))(ReplayOutcome,error){
+ manifest bunnyguard.Policy,root string,key []byte,runner func(context.Context)(HeadlessReport,error))(ReplayOutcome,error){
  if err:=ValidateHeadlessConfig(cfg,login,scope,manifest);err!=nil{return ReplayOutcome{},err}
  if scope.MaxBrowserRequests>manifest.MaxNetworkCalls/2{
   return ReplayOutcome{},errors.New("reviewed engagement cannot cover two independently budgeted browser runs")
  }
  if runner==nil{return ReplayOutcome{},errors.New("fresh authenticated browser runner required")}
+ if len(key)!=32{return ReplayOutcome{},errors.New("private encrypted replay key required before network use")}
+ if root==""||len(root)>2048{return ReplayOutcome{},errors.New("private replay evidence path required")}
  out:=ReplayOutcome{
   EngagementID:manifest.EngagementID,Origin:cfg.Origin,FreshBrowserProfiles:0,
   ImpactVerified:false,
@@ -110,9 +112,6 @@ func replayWith(ctx context.Context,scope ApprovedScope,login Plan,cfg HeadlessC
  }
  data,err:=json.Marshal(capsule)
  if err!=nil{return out,err}
- key,err:=bunnyartifact.ReadKey()
- if err!=nil{return out,errors.New("OS-owned evidence encryption key required for replay capsule")}
- if root==""||len(root)>2048{return out,errors.New("private replay evidence path required")}
  dest:=filepath.Join(root,manifest.EngagementID)
  if err:=os.MkdirAll(dest,0700);err!=nil{return out,err}
  name:=fmt.Sprintf("browser-replay-%d",time.Now().UnixNano())
@@ -126,7 +125,9 @@ func replayWith(ctx context.Context,scope ApprovedScope,login Plan,cfg HeadlessC
 // twice and preserves private encrypted provenance for both runs.
 func ReplayApprovedFreshState(ctx context.Context,scope ApprovedScope,login Plan,cfg HeadlessCrawlConfig,
  manifest bunnyguard.Policy,root string)(ReplayOutcome,error){
- return replayWith(ctx,scope,login,cfg,manifest,root,func(ctx context.Context)(HeadlessReport,error){
+ key,err:=bunnyartifact.ReadKey()
+ if err!=nil{return ReplayOutcome{},errors.New("OS-owned evidence key required before replay")}
+ return replayWith(ctx,scope,login,cfg,manifest,root,key,func(ctx context.Context)(HeadlessReport,error){
   return RunConfiguredHeadlessCrawl(ctx,scope,login,cfg,manifest,root)
  })
 }
