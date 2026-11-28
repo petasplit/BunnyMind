@@ -4,6 +4,7 @@ package bunnyguard
 
 import (
  "bufio"
+ "context"
  "crypto/sha256"
  "encoding/hex"
  "encoding/json"
@@ -16,6 +17,8 @@ import (
  "strings"
  "sync"
  "time"
+
+ "github.com/enowdev/antares/internal/bunnyquota"
 )
 
 const EnvPolicy = "ANTARES_BUNNY_GUARD_POLICY"
@@ -260,6 +263,17 @@ func (g *Guard) Evaluate(session,tool,args string)Decision{
   if g.total>=g.policy.MaxNetworkCalls{d=Decision{Reason:"request budget exhausted"}
   }else if g.policy.MinIntervalMS>0&&!g.last.IsZero()&&time.Since(g.last)<time.Duration(g.policy.MinIntervalMS)*time.Millisecond{
    d=Decision{Reason:"minimum request interval not reached"}
+  }
+ }
+ // Single-request network tools reserve against the same persisted
+ // cross-process ledger as the Python, crawler and browser engines.
+ // Bulk runners themselves reserve worst-case calls before launch.
+ if network&&d.Allowed{
+  switch tool{
+  case "scoped_read","program_intake","passive_subdomains":
+   if _,err:=bunnyquota.ReserveShared(context.Background(),g.policy.EngagementID,1,g.policy.MaxNetworkCalls);err!=nil{
+    d=Decision{Allowed:false,Reason:"shared network budget exhausted or inaccessible"}
+   }
   }
  }
  if err:=g.appendAudit(session,tool,args,origin,network,d);err!=nil{return Decision{Reason:"audit failure: "+err.Error()}}
