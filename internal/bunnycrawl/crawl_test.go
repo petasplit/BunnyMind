@@ -50,7 +50,7 @@ func TestCrawlOnlySameOriginSafeReadLinks(t *testing.T){
  if err!=nil{t.Fatal(err)}
  if hitExternal!=0||hitLogout!=0{t.Fatal("crawler requested an unapproved or unsafe endpoint")}
  if out.RequestsUsed!=3{t.Fatalf("expected exactly 3 in-scope GETs, got %+v",out)}
- if len(out.DiscoveredPaths)!=2{t.Fatalf("expected next and script link candidates; got %+v",out.DiscoveredPaths)}
+ if len(out.DiscoveredPaths)!=3{t.Fatalf("expected root rediscovered, next and script link candidates; got %+v",out.DiscoveredPaths)}
  for _,p:=range out.DiscoveredPaths{
   if strings.Contains(p,"logout")||strings.Contains(p,"?token")||strings.Contains(p,"example.invalid"){
    t.Fatal("unsafe URL appeared in crawl report")
