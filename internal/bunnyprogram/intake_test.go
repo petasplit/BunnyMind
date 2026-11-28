@@ -29,7 +29,7 @@ const sampleHTML=`<!doctype html><html><head><title>Example program</title></hea
 func TestAllowedProgramURLStrict(t *testing.T){
  pass:=[]string{
   "https://yeswehack.com/programs/doctolib-public-bug-bounty-program",
-  "https://yeswehack.com/programs/sample"
+  "https://yeswehack.com/programs/sample",
  }
  for _,url:=range pass{if _,err:=AllowedProgramURL(url);err!=nil{t.Fatalf("reject %s: %v",url,err)}}
  bad:=[]string{
